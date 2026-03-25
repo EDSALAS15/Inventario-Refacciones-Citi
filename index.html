@@ -157,8 +157,10 @@ tbody tr.row-selected td{color:var(--blue-tx);}
   <div class="fcard">
     <div class="fn">InventarioAlmacen.xlsx</div>
     <div class="fd">Existencias por almacén</div>
-    <div class="fstatus"><div class="dot" id="dot-inv"></div><span id="st-inv">Sin cargar</span></div>
-    <label class="ubtn" for="f-inv"><span id="btn-inv">Cargar archivo</span></label>
+    <div class="fstatus"><div class="dot" id="dot-inv"></div><span id="st-inv">Conectando a GitHub…</span></div>
+    <button class="ubtn" onclick="fetchFromGitHub()" id="btn-inv" style="cursor:pointer;border:none;">🔄 Actualizar ahora</button>
+    <div style="margin-top:6px;font-size:10px;color:var(--tx3)">O carga un archivo local:</div>
+    <label class="ubtn" for="f-inv" style="margin-top:4px;background:var(--surf2);color:var(--tx2);border-color:var(--bord2)"><span>📂 Cargar archivo local</span></label>
     <input type="file" id="f-inv" accept=".xls,.xlsx,.csv">
     <button onclick="resetStorage()" id="btn-reset"
       style="display:none;width:100%;margin-top:6px;padding:5px 0;font-size:11px;color:var(--red-tx);background:var(--red-bg);border:.5px solid var(--red);border-radius:6px;cursor:pointer;">
@@ -462,14 +464,60 @@ async function clearStorage(){
   }}catch(e){}
 }
 
+// ══ AUTO-CARGA DESDE GITHUB ══════════════════════════════════
+// URL raw del archivo Excel en GitHub (commit fijo)
+const GITHUB_RAW_URL =
+  'https://raw.githubusercontent.com/EDSALAS15/Inventario-Refacciones-Citi/180bde1d6dfbdfecaeacc9022fcc03ab929d98d1/InventarioAlmacen.xlsx';
+
+async function fetchFromGitHub(){
+  const statusEl = document.getElementById('st-inv');
+  const dotEl    = document.getElementById('dot-inv');
+  dotEl.className = 'dot';
+  statusEl.textContent = '⏳ Descargando desde GitHub…';
+  try{
+    const resp = await fetch(GITHUB_RAW_URL);
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const buf  = await resp.arrayBuffer();
+    const wb   = XLSX.read(buf, {type:'array'});
+    const sName= wb.SheetNames.includes('InventarioAlmacenCarga')
+                  ? 'InventarioAlmacenCarga'
+                  : wb.SheetNames.includes('InventarioAlmacen')
+                    ? 'InventarioAlmacen'
+                    : wb.SheetNames[0];
+    invData    = XLSX.utils.sheet_to_json(wb.Sheets[sName], {defval:''});
+    const mpSheet = wb.SheetNames.find(s=>/c[oó]digos|mp|mtto|cat[aá]logo/i.test(s)&&s!==sName)
+                  || wb.SheetNames.find(s=>s!==sName);
+    const mpRows  = mpSheet ? XLSX.utils.sheet_to_json(wb.Sheets[mpSheet],{defval:''}) : [];
+    window._mpData = mpRows;
+    save(K_INV, invData);
+    save('inv_mp_v10', mpRows);
+    const now = new Date().toLocaleString('es-MX');
+    save(K_TS, now);
+    document.getElementById('ts').textContent = 'Actualizado: '+now;
+    updateStatus();
+    selTipos.clear(); selAlms.clear(); selRows.clear();
+    buildAndRender();
+  } catch(err){
+    // Si falla la descarga, cargar datos previos del almacenamiento local
+    console.warn('No se pudo descargar desde GitHub:', err.message);
+    statusEl.textContent = '⚠️ Sin conexión — cargando datos locales…';
+    await loadFromStorage();
+  }
+}
+
+async function loadFromStorage(){
+  invData = await load(K_INV);
+  window._mpData = await load('inv_mp_v10')||[];
+  const ts = await load(K_TS);
+  if(ts) document.getElementById('ts').textContent = 'Actualizado: '+ts;
+  updateStatus();
+  if(invData && invData.length) buildAndRender();
+}
+
 // ══ INIT ═════════════════════════════════════════════════════
 async function init(){
-  invData=await load(K_INV);
-  window._mpData=await load('inv_mp_v10')||[];
-  const ts=await load(K_TS);
-  if(ts)document.getElementById('ts').textContent='Actualizado: '+ts;
-  updateStatus();
-  if(invData&&invData.length)buildAndRender();
+  // Siempre intentar descargar la versión más reciente de GitHub
+  await fetchFromGitHub();
 }
 
 // ══ CARGA DE ARCHIVO ═════════════════════════════════════════
