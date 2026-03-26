@@ -708,16 +708,16 @@ function applyFilters(){
   const sTnec=MS.tnec.sel, sTipo=MS.tipo.sel, sExist=MS.exist.sel;
   const srch=DOM['search'].value.toLowerCase();
 
+  // NOTA: el filtro de almacén NO se aplica en baseClas/baseSC.
+  // Se aplica solo como highlight visual en renderAll (igual que el BI de barras).
+  // Esto garantiza que la gráfica mantenga siempre el mismo tamaño y número de columnas.
   const filt=(rows,extraFn)=>{
     let r=rows;
-    // Almacén
-    if(sAlm.size>0){if(sAlm.has('__none__'))r=[];else r=r.filter(x=>sAlm.has(x.almacen));}
-    // Existencia (opciones fijas: 'Con existencia' / 'Sin existencia')
+    // Existencia
     if(sExist.size>0 && !sExist.has('__none__')){
       const conEx=sExist.has('Con existencia'), sinEx=sExist.has('Sin existencia');
       if(conEx && !sinEx) r=r.filter(x=>x.existencia>0);
       else if(sinEx && !conEx) r=r.filter(x=>x.existencia<=0);
-      // si ambas o ninguna → no filtra
     }
     // Clasificación
     if(sClas.size>0){if(sClas.has('__none__'))r=[];else r=r.filter(x=>!x.clasif||sClas.has(x.clasif));}
@@ -729,7 +729,6 @@ function applyFilters(){
   };
 
   if(modoRefac==='prev'){
-    // Tipo de Mantenimiento como MS
     const tipoFn=sTipo.size>0&&!sTipo.has('__none__') ? r=>sTipo.has(r.tipo) : null;
     baseClas=filt(allClas,tipoFn);
     baseSC=[...allSC];
@@ -744,19 +743,18 @@ function applyFilters(){
 // ══ RENDER PRINCIPAL ═════════════════════════════════════════
 function renderAll(){
   const activeRows=modoRefac==='prev'?baseClas:baseSC;
+  // Universo completo: siempre igual → gráfica de almacén tiene tamaño y columnas fijos
+  const almUniverse=modoRefac==='prev'?allClas:allSC;
 
-  // Universo de columnas para la gráfica de almacén:
-  // - Si hay filtro sidebar de almacén → solo los almacenes filtrados (activeRows)
-  //   para que la gráfica muestre únicamente las barras relevantes con altura real.
-  // - Si no hay filtro de almacén → universo completo para mantener columnas estables
-  //   al aplicar otros filtros (tipo, existencia, etc.).
-  const sidebarAlmActivo = MS.alm.sel.size>0 && !MS.alm.sel.has('__none__');
-  const almUniverse = sidebarAlmActivo ? activeRows : (modoRefac==='prev'?allClas:allSC);
-
-  // Filas BI (clic en gráfica): aplicar sobre activeRows
+  // BI de tipo y almacén (clic en gráfica)
   let biRows=activeRows;
   if(selTipos.size>0) biRows=biRows.filter(r=>selTipos.has(r.tipo));
   if(selAlms.size>0)  biRows=biRows.filter(r=>selAlms.has(r.almacen));
+
+  // Sidebar almacén: actúa igual que BI — filtra la tabla y resalta barras,
+  // pero NO cambia el número de columnas de la gráfica
+  const sidebarAlmActivo = MS.alm.sel.size>0 && !MS.alm.sel.has('__none__');
+  if(sidebarAlmActivo) biRows=biRows.filter(r=>MS.alm.sel.has(r.almacen));
 
   const hasRowSel=selRows.size>0;
   const selectedRows=hasRowSel?biRows.filter(r=>selRows.has(r.codigo)):biRows;
@@ -764,13 +762,18 @@ function renderAll(){
   const rowSelTipos=hasRowSel?new Set(selectedRows.map(r=>r.tipo)):selTipos;
   const rowSelAlms =hasRowSel?new Set(selectedRows.map(r=>r.almacen)):selAlms;
 
-  // Highlight de almacén en gráfica: clic en barra (BI) tiene prioridad sobre sidebar
-  const almHighlight = rowSelAlms.size>0 ? rowSelAlms : new Set();
+  // Highlight de barras: BI tiene prioridad; si no hay BI, usar sidebar almacén
+  const almHighlight = rowSelAlms.size>0 ? rowSelAlms
+                     : sidebarAlmActivo   ? MS.alm.sel
+                     : new Set();
 
-  updateKPIs(activeRows,chartSource);
-  renderChartTipos(activeRows,rowSelTipos,rowSelAlms,hasRowSel?selectedRows:null);
+  updateKPIs(activeRows, chartSource);
+  renderChartTipos(activeRows, rowSelTipos, rowSelAlms, hasRowSel?selectedRows:null);
+  // La gráfica de almacén siempre recibe almUniverse (completo) → tamaño fijo.
+  // Las alturas se calculan desde activeRows (filtrado por tipo/exist/clas/tnec).
+  // El highlight (dimming) viene de almHighlight.
   renderChartAlm(activeRows, almUniverse, rowSelTipos, almHighlight, hasRowSel?selectedRows:null);
-  renderTables(biRows,selectedRows);
+  renderTables(biRows, selectedRows);
   updateBIBadge();
   const hasSel=selTipos.size>0||selAlms.size>0||selRows.size>0||sidebarAlmActivo;
   ['card-tipos','card-alm','tcard'].forEach(id=>DOM[id].classList.toggle('has-sel',hasSel));
