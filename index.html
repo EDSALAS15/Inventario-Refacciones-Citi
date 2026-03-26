@@ -485,21 +485,23 @@ function _applyWorkbook(wb){
 
 // ══ AUTO-CARGA AL ABRIR ══════════════════════════════════════
 async function init(){
-  document.getElementById('st-inv').textContent='⏳ Actualizando datos…';
+  const stEl=document.getElementById('st-inv');
+  stEl.textContent='⏳ Actualizando datos…';
   try{
     const resp=await fetch(_SRC);
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    if(!resp.ok) throw new Error('HTTP '+resp.status+' al descargar el archivo');
     const buf=await resp.arrayBuffer();
     _applyWorkbook(XLSX.read(buf,{type:'array'}));
   } catch(err){
-    console.warn('Carga automática falló:',err.message);
+    // Mostrar error exacto en pantalla
+    stEl.innerHTML='<span style="color:var(--red-tx)">⚠️ '+err.message+'</span>';
+    // Intentar datos locales como fallback
     invData=await load(K_INV);
     window._mpData=await load('inv_mp_v10')||[];
     const ts=await load(K_TS);
     if(ts) document.getElementById('ts').textContent='Actualizado: '+ts;
     updateStatus();
     if(invData&&invData.length) buildAndRender();
-    else document.getElementById('st-inv').textContent='⚠️ Sin conexión — carga un archivo local';
   }
 }
 
