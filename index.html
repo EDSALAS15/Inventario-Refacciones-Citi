@@ -118,26 +118,21 @@ tbody tr.row-selected{background:var(--blue-bg)!important;outline:.5px solid var
 tbody tr.row-dimmed{opacity:.3;}
 tbody tr.row-selected td{color:var(--blue-tx);}
 
-/* Multi-select Clasificación */
-.ms-wrap{position:relative;}
-.ms-trigger{width:100%;padding:5px 8px;font-size:12px;border:.5px solid var(--bord2);border-radius:6px;background:var(--surf);color:var(--tx);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:4px;min-height:30px;}
-.ms-trigger:hover{border-color:var(--blue);}
-.ms-trigger-txt{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx2);}
-.ms-trigger-arrow{font-size:9px;color:var(--tx3);flex-shrink:0;transition:transform .15s;}
-.ms-trigger.open .ms-trigger-arrow{transform:rotate(180deg);}
-.ms-dropdown{display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;background:var(--surf);border:.5px solid var(--bord2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:100;overflow:hidden;}
-.ms-dropdown.open{display:block;}
-.ms-search-inp{width:100%;padding:7px 10px;font-size:12px;border:none;border-bottom:.5px solid var(--bord);background:var(--surf2);color:var(--tx);outline:none;box-sizing:border-box;}
+/* Filtros inline checkbox */
+.ms-box{background:var(--surf2);border:.5px solid var(--bord);border-radius:6px;overflow:hidden;}
+.ms-search-inp{width:100%;padding:5px 8px;font-size:11px;border:none;border-bottom:.5px solid var(--bord);background:var(--surf2);color:var(--tx);outline:none;box-sizing:border-box;}
 .ms-search-inp::placeholder{color:var(--tx3);}
-.ms-options{max-height:180px;overflow-y:auto;}
-.ms-opt{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12px;cursor:pointer;transition:background .1s;}
-.ms-opt:hover{background:var(--surf2);}
-.ms-opt input[type=checkbox]{width:13px;height:13px;accent-color:var(--blue);cursor:pointer;flex-shrink:0;}
-.ms-opt label{cursor:pointer;color:var(--tx);flex:1;}
-.ms-footer{padding:6px 10px;border-top:.5px solid var(--bord);display:flex;gap:6px;}
-.ms-footer button{flex:1;padding:4px 0;font-size:11px;border:.5px solid var(--bord2);border-radius:5px;background:var(--surf2);color:var(--tx2);cursor:pointer;}
-.ms-footer button:hover{background:var(--blue-bg);color:var(--blue-tx);border-color:var(--blue);}
+.ms-options{max-height:130px;overflow-y:auto;}
+.ms-opt{display:flex;align-items:center;gap:7px;padding:4px 8px;font-size:11px;cursor:pointer;transition:background .1s;}
+.ms-opt:hover{background:var(--surf);}
+.ms-opt.ms-opt-all{border-bottom:.5px solid var(--bord);font-weight:600;}
+.ms-opt input[type=checkbox]{width:12px;height:12px;accent-color:var(--blue);cursor:pointer;flex-shrink:0;margin:0;}
+.ms-opt label{cursor:pointer;color:var(--tx);flex:1;line-height:1.3;}
+.ms-opt.ms-opt-all label{color:var(--blue-tx);}
 .ms-badge{display:inline-block;background:var(--blue-bg);color:var(--blue-tx);font-size:10px;font-weight:600;padding:1px 5px;border-radius:10px;margin-left:4px;}
+/* Botón limpiar filtros */
+.btn-clear-filters{width:100%;padding:5px 0;font-size:11px;font-weight:600;color:var(--red-tx);background:var(--red-bg);border:.5px solid var(--red);border-radius:6px;cursor:pointer;text-align:center;transition:opacity .15s;margin-bottom:4px;}
+.btn-clear-filters:hover{opacity:.8;}
 </style>
 </head>
 <body>
@@ -168,6 +163,7 @@ tbody tr.row-selected td{color:var(--blue-tx);}
   <div>
     <h2>Filtros globales</h2>
     <div class="filters">
+      <button class="btn-clear-filters" onclick="clearAllFilters()">↺ Limpiar Filtros</button>
       <div>
         <div class="flabel">Tipo de Refacción</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:2px;">
@@ -176,44 +172,18 @@ tbody tr.row-selected td{color:var(--blue-tx);}
         </div>
       </div>
       <div>
-        <div class="flabel" style="display:flex;align-items:center;justify-content:space-between;">
-          Almacén
-          <span id="alm-badge" class="ms-badge" style="display:none"></span>
-        </div>
-        <div class="ms-wrap" id="ms-alm-wrap">
-          <div class="ms-trigger" id="ms-alm-trigger" onclick="msToggle('alm',event)">
-            <span class="ms-trigger-txt" id="ms-alm-txt">Todos</span>
-            <span class="ms-trigger-arrow">▼</span>
-          </div>
-          <div class="ms-dropdown" id="ms-alm-dropdown">
-            <input class="ms-search-inp" id="ms-alm-inp" type="text" placeholder="Buscar almacén..." oninput="msRender('alm')">
-            <div class="ms-options" id="ms-alm-options"></div>
-            <div class="ms-footer">
-              <button onclick="msAll('alm',event)">Todos</button>
-              <button onclick="msNone('alm',event)">Limpiar</button>
-            </div>
-          </div>
+        <div class="flabel">Almacén</div>
+        <div class="ms-box" id="ms-alm-box">
+          <input class="ms-search-inp" id="ms-alm-inp" type="text" placeholder="Buscar almacén..." oninput="msRender('alm')">
+          <div class="ms-options" id="ms-alm-options"></div>
         </div>
       </div>
       <div id="wrap-tipo"><div class="flabel">Tipo de Mantenimiento</div><select id="f-tipo"><option value="">Todos los tipos</option></select></div>
       <div id="wrap-familia" style="display:none">
-        <div class="flabel" style="display:flex;align-items:center;justify-content:space-between;">
-          <span id="lbl-familia">Familia</span>
-          <span id="fam-badge" class="ms-badge" style="display:none"></span>
-        </div>
-        <div class="ms-wrap" id="ms-fam-wrap">
-          <div class="ms-trigger" id="ms-fam-trigger" onclick="msToggle('fam',event)">
-            <span class="ms-trigger-txt" id="ms-fam-txt">Todas</span>
-            <span class="ms-trigger-arrow">▼</span>
-          </div>
-          <div class="ms-dropdown" id="ms-fam-dropdown">
-            <input class="ms-search-inp" id="ms-fam-inp" type="text" placeholder="Buscar familia..." oninput="msRender('fam')">
-            <div class="ms-options" id="ms-fam-options"></div>
-            <div class="ms-footer">
-              <button onclick="msAll('fam',event)">Todas</button>
-              <button onclick="msNone('fam',event)">Limpiar</button>
-            </div>
-          </div>
+        <div class="flabel"><span id="lbl-familia">Familia</span></div>
+        <div class="ms-box" id="ms-fam-box">
+          <input class="ms-search-inp" id="ms-fam-inp" type="text" placeholder="Buscar familia..." oninput="msRender('fam')">
+          <div class="ms-options" id="ms-fam-options"></div>
         </div>
       </div>
       <div><div class="flabel">Existencia</div>
@@ -223,45 +193,18 @@ tbody tr.row-selected td{color:var(--blue-tx);}
           <option value="sin">Sin existencia</option>
         </select>
       </div>
-
       <div>
-        <div class="flabel" style="display:flex;align-items:center;justify-content:space-between;">
-          Clasificación
-          <span id="clas-badge" class="ms-badge" style="display:none"></span>
-        </div>
-        <div class="ms-wrap" id="ms-clas-wrap">
-          <div class="ms-trigger" id="ms-clas-trigger" onclick="msToggle('clas',event)">
-            <span class="ms-trigger-txt" id="ms-clas-txt">Todas</span>
-            <span class="ms-trigger-arrow">▼</span>
-          </div>
-          <div class="ms-dropdown" id="ms-clas-dropdown">
-            <input class="ms-search-inp" id="ms-clas-inp" type="text" placeholder="Buscar..." oninput="msRender('clas')">
-            <div class="ms-options" id="ms-clas-options"></div>
-            <div class="ms-footer">
-              <button onclick="msAll('clas',event)">Seleccionar todos</button>
-              <button onclick="msNone('clas',event)">Limpiar</button>
-            </div>
-          </div>
+        <div class="flabel">Clasificación</div>
+        <div class="ms-box" id="ms-clas-box">
+          <input class="ms-search-inp" id="ms-clas-inp" type="text" placeholder="Buscar clasificación..." oninput="msRender('clas')">
+          <div class="ms-options" id="ms-clas-options"></div>
         </div>
       </div>
       <div>
-        <div class="flabel" style="display:flex;align-items:center;justify-content:space-between;">
-          Tipo de Necesidad
-          <span id="tnec-badge" class="ms-badge" style="display:none"></span>
-        </div>
-        <div class="ms-wrap" id="ms-tnec-wrap">
-          <div class="ms-trigger" id="ms-tnec-trigger" onclick="msToggle('tnec',event)">
-            <span class="ms-trigger-txt" id="ms-tnec-txt">Todos</span>
-            <span class="ms-trigger-arrow">▼</span>
-          </div>
-          <div class="ms-dropdown" id="ms-tnec-dropdown">
-            <input class="ms-search-inp" id="ms-tnec-inp" type="text" placeholder="Buscar..." oninput="msRender('tnec')">
-            <div class="ms-options" id="ms-tnec-options"></div>
-            <div class="ms-footer">
-              <button onclick="msAll('tnec',event)">Todos</button>
-              <button onclick="msNone('tnec',event)">Limpiar</button>
-            </div>
-          </div>
+        <div class="flabel">Tipo de Necesidad</div>
+        <div class="ms-box" id="ms-tnec-box">
+          <input class="ms-search-inp" id="ms-tnec-inp" type="text" placeholder="Buscar tipo..." oninput="msRender('tnec')">
+          <div class="ms-options" id="ms-tnec-options"></div>
         </div>
       </div>
     </div>
@@ -365,7 +308,10 @@ function cacheDOM(){
    'k-sin','k-sin-p','k-sc','k-sc-lbl','k-sc-exist','kpi-mat',
    'active-filter','card-tipos','card-alm','tcard','th-tipo',
    'ttl-chart-tipos','lbl-familia','wrap-tipo','wrap-familia','f-tipo',
-   'btn-prev','btn-corr'].forEach(id=>{DOM[id]=$(id);});
+   'btn-prev','btn-corr',
+   'ms-alm-options','ms-fam-options','ms-clas-options','ms-tnec-options',
+   'ms-alm-inp','ms-fam-inp','ms-clas-inp','ms-tnec-inp'
+  ].forEach(id=>{DOM[id]=$(id);});
 }
 
 // ══ ESTADO GLOBAL ═══════════════════════════════════════════
@@ -374,29 +320,38 @@ let allClas=[],allSC=[];
 let baseClas=[],baseSC=[];
 let selTipos=new Set(), selAlms=new Set(), selRows=new Set();
 let modoRefac='prev', familiaCol='';
-let _searchTimer=null;
 
-// ══ MOTOR MULTI-SELECT GENÉRICO ══════════════════════════════
+
+// ══ MOTOR MULTI-SELECT INLINE ════════════════════════════════
+// sel vacío = todos (no filtra). sel con '__none__' = ninguno. sel con valores = solo esos.
 const MS={
-  alm: {sel:new Set(),opts:[],badgeId:'alm-badge', txtId:'ms-alm-txt', inpId:'ms-alm-inp', optsId:'ms-alm-options'},
-  fam: {sel:new Set(),opts:[],badgeId:'fam-badge', txtId:'ms-fam-txt', inpId:'ms-fam-inp', optsId:'ms-fam-options'},
-  clas:{sel:new Set(),opts:[],badgeId:'clas-badge',txtId:'ms-clas-txt',inpId:'ms-clas-inp',optsId:'ms-clas-options'},
-  tnec:{sel:new Set(),opts:[],badgeId:'tnec-badge',txtId:'ms-tnec-txt',inpId:'ms-tnec-inp',optsId:'ms-tnec-options'}
+  alm: {sel:new Set(), opts:[], inpId:'ms-alm-inp', optsId:'ms-alm-options'},
+  fam: {sel:new Set(), opts:[], inpId:'ms-fam-inp', optsId:'ms-fam-options'},
+  clas:{sel:new Set(), opts:[], inpId:'ms-clas-inp', optsId:'ms-clas-options'},
+  tnec:{sel:new Set(), opts:[], inpId:'ms-tnec-inp', optsId:'ms-tnec-options'}
 };
 
-// sel vacío = "todos" (no filtra). sel con '__none__' = ninguno. sel con valores = solo esos.
+function msIsAll(k){ return MS[k].sel.size===0; }
+
 function msPopulate(k,opts){
-  MS[k].opts=opts; MS[k].sel.clear(); msRender(k); msTxt(k);
+  MS[k].opts=opts; MS[k].sel.clear(); msRender(k);
 }
 
 function msRender(k){
-  const s=MS[k], q=($(s.inpId)||{}).value||'';
+  const s=MS[k];
+  const q=($(s.inpId)||{}).value||'';
   const ql=q.toLowerCase();
-  const opts=q?s.opts.filter(o=>o.toLowerCase().includes(ql)):s.opts;
+  const opts=q ? s.opts.filter(o=>o.toLowerCase().includes(ql)) : s.opts;
   const el=$(s.optsId); if(!el) return;
+  const isAll=msIsAll(k);
   const frag=document.createDocumentFragment();
+  // Fila "Todos" siempre visible (sin filtrar por búsqueda)
+  const allDiv=document.createElement('div');
+  allDiv.className='ms-opt ms-opt-all';
+  allDiv.innerHTML=`<input type="checkbox" id="mso-${k}-__all__"${isAll?' checked':''} onchange="msChgAll('${k}',this)"><label for="mso-${k}-__all__">Todos</label>`;
+  frag.appendChild(allDiv);
   for(const o of opts){
-    const chk=s.sel.size===0||s.sel.has(o);
+    const chk=isAll||s.sel.has(o);
     const id='mso-'+k+'-'+o.replace(/\W/g,'_');
     const div=document.createElement('div'); div.className='ms-opt';
     div.innerHTML=`<input type="checkbox" id="${id}" value="${o}"${chk?' checked':''} onchange="msChg('${k}',this)"><label for="${id}">${o}</label>`;
@@ -405,54 +360,63 @@ function msRender(k){
   el.innerHTML=''; el.appendChild(frag);
 }
 
+function msChgAll(k,el){
+  // Checkbox "Todos": si se marca → limpiar sel (todos); si se desmarca → ninguno
+  if(el.checked){ MS[k].sel.clear(); }
+  else { MS[k].sel=new Set(['__none__']); }
+  msRender(k); msFilter();
+}
+
 function msChg(k,el){
   const s=MS[k];
   if(el.checked){
+    // Si venía de "todos", expandir a todos-menos-nada, luego añadir este
+    if(s.sel.has('__none__')) s.sel.delete('__none__');
+    if(s.sel.size===0){
+      // Estaba en "todos" → pasar a modo selección explícita con solo este
+      s.opts.forEach(o=>{ if(o!==el.value) s.sel.add(o); });
+      // Ahora s.sel tiene todos excepto el que se "acaba de marcar desde todos"
+      // → agregar el marcado también para que queden todos marcados → colapsar a todos
+    }
     s.sel.add(el.value);
-    if(s.sel.size===s.opts.length) s.sel.clear(); // todos marcados → volver a "todos"
+    if(s.sel.size===s.opts.length) s.sel.clear(); // todos explícitos → colapsar a "todos"
   } else {
-    if(s.sel.size===0) s.opts.forEach(o=>{if(o!==el.value) s.sel.add(o);}); // expandir desde "todos"
-    else s.sel.delete(el.value);
-    if(s.sel.size===0) s.sel.add('__none__'); // desmarcó el último → ninguno
+    if(s.sel.size===0){
+      // Desde "todos": expandir y quitar este
+      s.opts.forEach(o=>{ if(o!==el.value) s.sel.add(o); });
+    } else {
+      s.sel.delete(el.value);
+    }
+    if(s.sel.size===0) s.sel.add('__none__');
   }
-  msTxt(k); msFilter();
+  msRender(k); msFilter();
 }
 
-function msAll(k,e){
-  e.stopPropagation(); MS[k].sel.clear(); msRender(k); msTxt(k); msFilter();
-}
-function msNone(k,e){
-  e.stopPropagation(); MS[k].sel=new Set(['__none__']); msRender(k); msTxt(k); msFilter();
+function msFilter(){
+  selTipos.clear(); selAlms.clear(); selRows.clear();
+  if(allClas.length||allSC.length) scheduleFilter();
 }
 
-function msTxt(k){
-  const s=MS[k];
-  const txt=$(s.txtId), badge=$(s.badgeId);
-  if(!txt) return;
-  if(s.sel.size===0){txt.textContent='Todos'; if(badge) badge.style.display='none';}
-  else if(s.sel.has('__none__')){txt.textContent='Ninguno'; if(badge) badge.style.display='none';}
-  else{const n=s.sel.size; txt.textContent=n===1?[...s.sel][0]:n+' selec.'; if(badge){badge.textContent=n; badge.style.display='inline-block';}}
+// Aplazamiento de filtrado: evita re-renders en cada clic consecutivo
+let _filterTimer=null;
+function scheduleFilter(){
+  clearTimeout(_filterTimer);
+  _filterTimer=setTimeout(applyFilters, 80);
 }
 
-function msToggle(k,e){
-  e.stopPropagation();
-  const dd=$('ms-'+k+'-dropdown'), tr=$('ms-'+k+'-trigger');
-  if(!dd||!tr) return;
-  const open=dd.classList.contains('open');
-  document.querySelectorAll('.ms-dropdown.open').forEach(d=>d.classList.remove('open'));
-  document.querySelectorAll('.ms-trigger.open').forEach(d=>d.classList.remove('open'));
-  if(!open){
-    dd.classList.add('open'); tr.classList.add('open');
-    const inp=$(MS[k].inpId); if(inp)inp.value='';
+function clearAllFilters(){
+  // Resetear todos los multi-select a "todos"
+  ['alm','fam','clas','tnec'].forEach(k=>{
+    MS[k].sel.clear();
+    const inp=$(MS[k].inpId); if(inp) inp.value='';
     msRender(k);
-    setTimeout(()=>document.addEventListener('click',ev=>{
-      const w=$('ms-'+k+'-wrap');
-      if(w&&!w.contains(ev.target)){dd.classList.remove('open');tr.classList.remove('open');}
-    },{once:true}),0);
-  }
+  });
+  // Resetear select de existencia y tipo
+  if(DOM['f-exist']) DOM['f-exist'].value='';
+  if(DOM['f-tipo'])  DOM['f-tipo'].value='';
+  selTipos.clear(); selAlms.clear(); selRows.clear();
+  applyFilters();
 }
-
-function msFilter(){selTipos.clear();selAlms.clear();selRows.clear();if(allClas.length||allSC.length)applyFilters();}
 
 // ══ STORAGE ══════════════════════════════════════════════════
 async function save(k,v){
@@ -984,12 +948,12 @@ function exportTabla(tab){
 // ══ EVENTOS ══════════════════════════════════════════════════
 ['f-tipo','f-exist'].forEach(id=>{
   const el=$(id);
-  if(el)el.addEventListener('change',()=>{if(allClas.length||allSC.length)applyFilters();});
+  if(el) el.addEventListener('change',()=>{ if(allClas.length||allSC.length) applyFilters(); });
 });
-// Debounce en búsqueda: espera 200ms tras dejar de escribir antes de filtrar
+// Búsqueda con debounce (200ms) — usa el mismo timer que scheduleFilter
 $('search').addEventListener('input',()=>{
-  clearTimeout(_searchTimer);
-  _searchTimer=setTimeout(()=>{if(allClas.length)applyFilters();},200);
+  clearTimeout(_filterTimer);
+  _filterTimer=setTimeout(()=>{ if(allClas.length) applyFilters(); }, 200);
 });
 
 init();
