@@ -355,8 +355,28 @@ const TC_LIST=['b-blue','b-teal','b-purple','b-amber','b-red','b-green'];
 const TC_MAP={}; let tci=0;
 function badgeClass(t){if(t==='Sin clasificar'||t==='Correctivo')return 'b-gray';if(!TC_MAP[t])TC_MAP[t]=TC_LIST[tci++%TC_LIST.length];return TC_MAP[t];}
 
+// ══ CACHÉ DE ELEMENTOS DOM ════════════════════════════════════
+const $ = id => document.getElementById(id);
+const DOM = {};
+function cacheDOM(){
+  ['ts','dot-inv','st-inv','btn-inv','btn-reset','empty','dash','f-exist',
+   'search','table-count','tb-det','tb-res','tb-alm','chart-tipos','chart-alm',
+   'k-mat','k-mat-lbl','k-tipos-sub','k-exist','k-exist-sub','k-con','k-con-p',
+   'k-sin','k-sin-p','k-sc','k-sc-lbl','k-sc-exist','kpi-mat',
+   'active-filter','card-tipos','card-alm','tcard','th-tipo',
+   'ttl-chart-tipos','lbl-familia','wrap-tipo','wrap-familia','f-tipo',
+   'btn-prev','btn-corr'].forEach(id=>{DOM[id]=$(id);});
+}
+
+// ══ ESTADO GLOBAL ═══════════════════════════════════════════
+let invData=null;
+let allClas=[],allSC=[];
+let baseClas=[],baseSC=[];
+let selTipos=new Set(), selAlms=new Set(), selRows=new Set();
+let modoRefac='prev', familiaCol='';
+let _searchTimer=null;
+
 // ══ MOTOR MULTI-SELECT GENÉRICO ══════════════════════════════
-// Cada clave: {sel:Set, opts:[], ids para DOM}
 const MS={
   alm: {sel:new Set(),opts:[],badgeId:'alm-badge', txtId:'ms-alm-txt', inpId:'ms-alm-inp', optsId:'ms-alm-options'},
   fam: {sel:new Set(),opts:[],badgeId:'fam-badge', txtId:'ms-fam-txt', inpId:'ms-fam-inp', optsId:'ms-fam-options'},
@@ -367,21 +387,25 @@ const MS={
 function msPopulate(k,opts){MS[k].opts=opts;MS[k].sel.clear();msRender(k);msTxt(k);}
 
 function msRender(k){
-  const s=MS[k], q=(document.getElementById(s.inpId)||{}).value||'';
-  const opts=q?s.opts.filter(o=>o.toLowerCase().includes(q.toLowerCase())):s.opts;
-  const el=document.getElementById(s.optsId); if(!el) return;
-  el.innerHTML=opts.map(o=>{
-    const chk=s.sel.size===0||s.sel.has(o)?'checked':'';
+  const s=MS[k], q=($(s.inpId)||{}).value||'';
+  const ql=q.toLowerCase();
+  const opts=q?s.opts.filter(o=>o.toLowerCase().includes(ql)):s.opts;
+  const el=$(s.optsId); if(!el) return;
+  const frag=document.createDocumentFragment();
+  for(const o of opts){
+    const chk=s.sel.size===0||s.sel.has(o);
     const id='mso-'+k+'-'+o.replace(/\W/g,'_');
-    return `<div class="ms-opt"><input type="checkbox" id="${id}" value="${o}" ${chk} onchange="msChg('${k}',this)"><label for="${id}">${o}</label></div>`;
-  }).join('');
+    const div=document.createElement('div'); div.className='ms-opt';
+    div.innerHTML=`<input type="checkbox" id="${id}" value="${o}"${chk?' checked':''}onchange="msChg('${k}',this)"><label for="${id}">${o}</label>`;
+    frag.appendChild(div);
+  }
+  el.innerHTML=''; el.appendChild(frag);
 }
 
 function msChg(k,el){
   const s=MS[k];
-  if(el.checked){
-    s.sel.add(el.value);
-  } else {
+  if(el.checked){s.sel.add(el.value);}
+  else{
     if(s.sel.size===0){s.opts.forEach(o=>{if(o!==el.value)s.sel.add(o);});}
     else s.sel.delete(el.value);
   }
@@ -394,7 +418,7 @@ function msNone(k,e){e.stopPropagation();MS[k].sel=new Set(['__none__']);msRende
 
 function msTxt(k){
   const s=MS[k];
-  const txt=document.getElementById(s.txtId), badge=document.getElementById(s.badgeId);
+  const txt=$(s.txtId), badge=$(s.badgeId);
   if(!txt) return;
   if(s.sel.size===0){txt.textContent='Todos';if(badge)badge.style.display='none';}
   else if(s.sel.has('__none__')){txt.textContent='Ninguno';if(badge)badge.style.display='none';}
@@ -403,17 +427,17 @@ function msTxt(k){
 
 function msToggle(k,e){
   e.stopPropagation();
-  const dd=document.getElementById('ms-'+k+'-dropdown'), tr=document.getElementById('ms-'+k+'-trigger');
+  const dd=$('ms-'+k+'-dropdown'), tr=$('ms-'+k+'-trigger');
   if(!dd||!tr) return;
   const open=dd.classList.contains('open');
   document.querySelectorAll('.ms-dropdown.open').forEach(d=>d.classList.remove('open'));
   document.querySelectorAll('.ms-trigger.open').forEach(d=>d.classList.remove('open'));
   if(!open){
     dd.classList.add('open'); tr.classList.add('open');
-    const inp=document.getElementById(MS[k].inpId); if(inp)inp.value='';
+    const inp=$(MS[k].inpId); if(inp)inp.value='';
     msRender(k);
     setTimeout(()=>document.addEventListener('click',ev=>{
-      const w=document.getElementById('ms-'+k+'-wrap');
+      const w=$('ms-'+k+'-wrap');
       if(w&&!w.contains(ev.target)){dd.classList.remove('open');tr.classList.remove('open');}
     },{once:true}),0);
   }
@@ -421,40 +445,19 @@ function msToggle(k,e){
 
 function msFilter(){selTipos.clear();selAlms.clear();selRows.clear();if(allClas.length||allSC.length)applyFilters();}
 
-// ══ ESTADO GLOBAL ═══════════════════════════════════════════
-let invData=null;
-let allClas=[],allSC=[];
-let baseClas=[],baseSC=[];
-let selTipos=new Set(), selAlms=new Set(), selRows=new Set();
-let modoRefac='prev', familiaCol='';
-
 // ══ STORAGE ══════════════════════════════════════════════════
-// Usa localStorage (persiste al abrir el archivo localmente)
-// con fallback a window.storage cuando corre en Claude.ai
 async function save(k,v){
   const json=JSON.stringify(v);
-  // 1) localStorage — funciona al abrir el HTML localmente
-  try{ localStorage.setItem('inv_dash_'+k, json); }catch(e){}
-  // 2) window.storage — funciona en Claude.ai
-  try{ if(window.storage) await window.storage.set(k,json); }catch(e){}
+  try{localStorage.setItem('inv_dash_'+k,json);}catch(e){}
+  try{if(window.storage)await window.storage.set(k,json);}catch(e){}
 }
 async function load(k){
-  // Intentar localStorage primero
-  try{
-    const v=localStorage.getItem('inv_dash_'+k);
-    if(v) return JSON.parse(v);
-  }catch(e){}
-  // Fallback a window.storage
-  try{
-    if(window.storage){const r=await window.storage.get(k);if(r)return JSON.parse(r.value);}
-  }catch(e){}
+  try{const v=localStorage.getItem('inv_dash_'+k);if(v)return JSON.parse(v);}catch(e){}
+  try{if(window.storage){const r=await window.storage.get(k);if(r)return JSON.parse(r.value);}}catch(e){}
   return null;
 }
 async function clearStorage(){
-  // Limpiar ambos storages
-  ['inv_v10','inv_mp_v10','inv_ts_v10'].forEach(k=>{
-    try{localStorage.removeItem('inv_dash_'+k);}catch(e){}
-  });
+  ['inv_v10','inv_mp_v10','inv_ts_v10'].forEach(k=>{try{localStorage.removeItem('inv_dash_'+k);}catch(e){}});
   try{if(window.storage){
     await window.storage.delete('inv_v10');
     await window.storage.delete('inv_mp_v10');
@@ -462,10 +465,31 @@ async function clearStorage(){
   }}catch(e){}
 }
 
+// ══ PARSER COMPARTIDO DE WORKBOOK ════════════════════════════
+function parseWorkbook(wb){
+  const sName=wb.SheetNames.includes('InventarioAlmacen')?'InventarioAlmacen':wb.SheetNames[0];
+  const invRows=XLSX.utils.sheet_to_json(wb.Sheets[sName],{defval:''});
+  const mpSheet=wb.SheetNames.find(s=>/c[oó]digos|mp|mtto|cat[aá]logo/i.test(s)&&s!==sName)||wb.SheetNames.find(s=>s!==sName);
+  const mpRows=mpSheet?XLSX.utils.sheet_to_json(wb.Sheets[mpSheet],{defval:''}):[]; 
+  return {invRows,mpRows};
+}
+
+function applyParsed(invRows,mpRows){
+  invData=invRows;
+  window._mpData=mpRows;
+  save(K_INV,invData); save('inv_mp_v10',mpRows);
+  const now=new Date().toLocaleString('es-MX');
+  save(K_TS,now);
+  DOM['ts'].textContent='Actualizado: '+now;
+  updateStatus();
+  selTipos.clear();selAlms.clear();selRows.clear();
+  buildAndRender();
+}
+
 // ══ AUTO-ACTUALIZACIÓN ══════════════════════════════════════
 async function autoUpdate(){
   const RAW_URL='https://raw.githubusercontent.com/EDSALAS15/Inventario-Refacciones-Citi/main/InventarioAlmacen.xlsx';
-  const tsEl=document.getElementById('ts');
+  const tsEl=DOM['ts'];
   const prevTs=tsEl.textContent;
   tsEl.textContent='ACTUALIZANDO';
   try{
@@ -473,38 +497,27 @@ async function autoUpdate(){
     if(!resp.ok)throw new Error('Sin respuesta');
     const buf=await resp.arrayBuffer();
     const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
-    const sName=wb.SheetNames.includes('InventarioAlmacen')?'InventarioAlmacen':wb.SheetNames[0];
-    invData=XLSX.utils.sheet_to_json(wb.Sheets[sName],{defval:''});
-    const mpSheet=wb.SheetNames.find(s=>/c[oó]digos|mp|mtto|cat[aá]logo/i.test(s)&&s!==sName)||wb.SheetNames.find(s=>s!==sName);
-    const mpRows=mpSheet?XLSX.utils.sheet_to_json(wb.Sheets[mpSheet],{defval:''}):[]; 
-    window._mpData=mpRows;
-    save(K_INV,invData); save('inv_mp_v10',mpRows);
-    const now=new Date().toLocaleString('es-MX');
-    save(K_TS,now);
-    tsEl.textContent='Actualizado: '+now;
-    updateStatus();
-    selTipos.clear();selAlms.clear();selRows.clear();
-    buildAndRender();
+    const {invRows,mpRows}=parseWorkbook(wb);
+    applyParsed(invRows,mpRows);
   }catch(e){
     tsEl.textContent=prevTs||'Sin datos cargados';
-    // Si falla la auto-actualización, seguir con datos en memoria
     if(invData&&invData.length)buildAndRender();
   }
 }
 
 // ══ INIT ═════════════════════════════════════════════════════
 async function init(){
+  cacheDOM();
   invData=await load(K_INV);
   window._mpData=await load('inv_mp_v10')||[];
   const ts=await load(K_TS);
-  if(ts)document.getElementById('ts').textContent='Actualizado: '+ts;
+  if(ts)DOM['ts'].textContent='Actualizado: '+ts;
   updateStatus();
-  // Auto-actualización silenciosa al abrir
   await autoUpdate();
 }
 
-// ══ CARGA DE ARCHIVO ═════════════════════════════════════════
-document.getElementById('f-inv').addEventListener('change',e=>readFile(e.target.files[0]));
+// ══ CARGA MANUAL DE ARCHIVO ══════════════════════════════════
+$('f-inv').addEventListener('change',e=>readFile(e.target.files[0]));
 
 function readFile(file){
   if(!file)return;
@@ -512,18 +525,8 @@ function readFile(file){
   r.onload=evt=>{
     try{
       const wb=XLSX.read(evt.target.result,{type:'binary'});
-      const sName=wb.SheetNames.includes('InventarioAlmacen')?'InventarioAlmacen':wb.SheetNames[0];
-      invData=XLSX.utils.sheet_to_json(wb.Sheets[sName],{defval:''});
-      const mpSheet=wb.SheetNames.find(s=>/c[oó]digos|mp|mtto|cat[aá]logo/i.test(s)&&s!==sName)||wb.SheetNames.find(s=>s!==sName);
-      const mpRows=mpSheet?XLSX.utils.sheet_to_json(wb.Sheets[mpSheet],{defval:''}):[]; 
-      window._mpData=mpRows;
-      save(K_INV,invData); save('inv_mp_v10',mpRows);
-      const now=new Date().toLocaleString('es-MX');
-      save(K_TS,now);
-      document.getElementById('ts').textContent='Actualizado: '+now;
-      updateStatus();
-      selTipos.clear();selAlms.clear();selRows.clear();
-      buildAndRender();
+      const {invRows,mpRows}=parseWorkbook(wb);
+      applyParsed(invRows,mpRows);
     }catch(e){alert('Error: '+e.message);}
   };
   r.readAsBinaryString(file);
@@ -531,39 +534,38 @@ function readFile(file){
 
 function updateStatus(){
   const d=invData, mp=window._mpData||[];
-  const hasData=d&&d.length>0;
-  document.getElementById('dot-inv').className='dot'+(hasData?' ok':'');
+  const hasData=!!(d&&d.length>0);
+  DOM['dot-inv'].className='dot'+(hasData?' ok':'');
   if(hasData){
-    const mp=window._mpData||[];
     const ts=localStorage.getItem('inv_dash_'+K_TS)||'';
-    document.getElementById('st-inv').innerHTML=
-      d.length.toLocaleString()+' registros'+(mp.length?' · '+mp.length+' cód.':'')+
+    DOM['st-inv'].innerHTML=d.length.toLocaleString()+' registros'+(mp.length?' · '+mp.length+' cód.':'')+
       (ts?'<br><span style="font-size:10px;color:var(--tx3)">En memoria desde: '+JSON.parse(ts)+'</span>':'');
   } else {
-    document.getElementById('st-inv').textContent='Sin datos en memoria';
+    DOM['st-inv'].textContent='Sin datos en memoria';
   }
-  document.getElementById('btn-inv').textContent=hasData?'Actualizar archivo':'Cargar archivo';
-  const btnReset=document.getElementById('btn-reset');
-  if(btnReset) btnReset.style.display=hasData?'block':'none';
+  DOM['btn-inv'].textContent=hasData?'Actualizar archivo':'Cargar archivo';
+  if(DOM['btn-reset'])DOM['btn-reset'].style.display=hasData?'block':'none';
 }
 
 async function resetStorage(){
   if(!confirm('¿Limpiar los datos en memoria? Deberás volver a cargar el archivo.')) return;
   invData=null; window._mpData=[];
   await clearStorage();
-  document.getElementById('empty').style.display='block';
-  document.getElementById('dash').style.display='none';
+  DOM['empty'].style.display='block';
+  DOM['dash'].style.display='none';
   updateStatus();
 }
 
 // ══ CONSTRUCCIÓN DE FILAS ════════════════════════════════════
 function buildRows(){
   const mpRaw=window._mpData||[];
-  const mpCols=mpRaw.length?Object.keys(mpRaw[0]):[];
   const invCols=invData.length?Object.keys(invData[0]):[];
-  const mpCompCol=mpCols.find(c=>c.trim()==='COMPONENTE')||mpCols.find(c=>/^componente$/i.test(c.trim()))||mpCols[2];
   const tiposSet=new Set();
-  for(const r of mpRaw){const v=String(r[mpCompCol]||'').trim().toUpperCase();if(v)tiposSet.add(v);}
+  if(mpRaw.length){
+    const mpCols=Object.keys(mpRaw[0]);
+    const mpCompCol=mpCols.find(c=>c.trim()==='COMPONENTE')||mpCols.find(c=>/^componente$/i.test(c.trim()))||mpCols[2];
+    for(const r of mpRaw){const v=String(r[mpCompCol]||'').trim().toUpperCase();if(v)tiposSet.add(v);}
+  }
   const fc=(ex,re,i)=>invCols.find(c=>c.trim()===ex)||invCols.find(c=>re.test(c.trim()))||invCols[i];
   const codCol  =fc('Código',     /^c[oó]digo$/i,    2);
   const mttoCol =fc('MTTO',       /^mtto$/i,          3);
@@ -571,30 +573,27 @@ function buildRows(){
   const existCol=fc('Existencias',/^exist/i,         12);
   const almCol  =fc('Almacén',    /^alm[aá]c[eé]n$/i,0);
   const divCol  =fc('Division',   /^divis/i,          1);
-  const famCands=['Familia','familia','FAMILIA'];
-  familiaCol=invCols.find(c=>famCands.includes(c.trim()))||invCols.find(c=>/^famil/i.test(c.trim()))||invCols.find(c=>/^clasif/i.test(c.trim()))||invCols[9]||'';
+  familiaCol=invCols.find(c=>['Familia','familia','FAMILIA'].includes(c.trim()))||invCols.find(c=>/^famil/i.test(c.trim()))||invCols.find(c=>/^clasif/i.test(c.trim()))||invCols[9]||'';
   const clasifCol=invCols.find(c=>/^clasificaci[oó]n$/i.test(c.trim()))||invCols.find(c=>/clasif/i.test(c.trim()))||null;
-  const tnecCol =invCols.find(c=>c.trim()==='Tipo de Necesidad')||invCols.find(c=>/^tipo de necesidad$/i.test(c.trim()))||invCols.find(c=>/necesidad/i.test(c.trim()))||null;
-  const lbl=document.getElementById('lbl-familia');
-  if(lbl)lbl.textContent=familiaCol||'Agrupación';
+  const tnecCol =invCols.find(c=>c.trim()==='Tipo de Necesidad')||invCols.find(c=>/necesidad/i.test(c.trim()))||null;
+  if(DOM['lbl-familia'])DOM['lbl-familia'].textContent=familiaCol||'Agrupación';
   const clas=[],sc=[];
+  const hasFam=!!familiaCol, hasClas=!!clasifCol, hasTnec=!!tnecCol;
   for(const r of invData){
     const codigo=String(r[codCol]||'').trim(); if(!codigo)continue;
-    const desc   =String(r[descCol]||'').trim();
-    const alm    =String(r[almCol] ||'').trim();
-    const div    =String(r[divCol] ||'').trim();
+    const alm=String(r[almCol]||'').trim(), div=String(r[divCol]||'').trim();
     const almacen=(alm&&div)?alm+' – '+div:(alm||div||'Sin almacén');
-    const exist  =parseFloat(String(r[existCol]||'0').replace(',','.'))||0;
+    const exist=parseFloat(String(r[existCol]||'0').replace(',','.'))||0;
     const mttoRaw=String(r[mttoCol]||'').trim().toUpperCase();
-    const familia=familiaCol?String(r[familiaCol]||'').trim()||'Sin familia':'Sin familia';
-    const clasif =clasifCol?String(r[clasifCol]||'').trim():'';
-    const tnec   =tnecCol  ?String(r[tnecCol]  ||'').trim():'';
-    if(tiposSet.has(mttoRaw)){
-      const tipo=mttoRaw.charAt(0)+mttoRaw.slice(1).toLowerCase();
-      clas.push({codigo,desc,almacen,existencia:exist,tipo,familia,clasif,tnec});
-    } else {
-      sc.push({codigo,desc,almacen,existencia:exist,tipo:familia||'Sin familia',familia,clasif,tnec});
-    }
+    const familia=hasFam?String(r[familiaCol]||'').trim()||'Sin familia':'Sin familia';
+    const row={
+      codigo, desc:String(r[descCol]||'').trim(),
+      almacen, existencia:exist, familia,
+      clasif:hasClas?String(r[clasifCol]||'').trim():'',
+      tnec:hasTnec?String(r[tnecCol]||'').trim():''
+    };
+    if(tiposSet.has(mttoRaw)){row.tipo=mttoRaw.charAt(0)+mttoRaw.slice(1).toLowerCase();clas.push(row);}
+    else{row.tipo=familia||'Sin familia';sc.push(row);}
   }
   return{clas,sc};
 }
@@ -604,10 +603,11 @@ function buildAndRender(){
   const{clas,sc}=buildRows();
   allClas=clas; allSC=sc;
   populateFilters();
-  msPopulate('clas',[...new Set([...allClas,...allSC].map(r=>r.clasif).filter(Boolean))].sort());
-  msPopulate('tnec',[...new Set([...allClas,...allSC].map(r=>r.tnec).filter(Boolean))].sort());
-  document.getElementById('empty').style.display='none';
-  document.getElementById('dash').style.display='flex';
+  const allRows=[...allClas,...allSC];
+  msPopulate('clas',[...new Set(allRows.map(r=>r.clasif).filter(Boolean))].sort());
+  msPopulate('tnec',[...new Set(allRows.map(r=>r.tnec).filter(Boolean))].sort());
+  DOM['empty'].style.display='none';
+  DOM['dash'].style.display='flex';
   updateKPIsc();
   applyFilters();
 }
@@ -617,14 +617,13 @@ function populateFilters(){
   const src=modoRefac==='corr'?allSC:allClas;
   msPopulate('alm',[...new Set(src.map(r=>r.almacen))].sort());
   if(modoRefac==='prev'){
-    document.getElementById('wrap-tipo').style.display='';
-    document.getElementById('wrap-familia').style.display='none';
+    DOM['wrap-tipo'].style.display='';
+    DOM['wrap-familia'].style.display='none';
     const tipos=[...new Set(allClas.map(r=>r.tipo))].sort();
-    const st=document.getElementById('f-tipo');
-    st.innerHTML='<option value="">Todos los tipos</option>'+tipos.map(t=>`<option>${t}</option>`).join('');
+    DOM['f-tipo'].innerHTML='<option value="">Todos los tipos</option>'+tipos.map(t=>`<option>${t}</option>`).join('');
   } else {
-    document.getElementById('wrap-tipo').style.display='none';
-    document.getElementById('wrap-familia').style.display='';
+    DOM['wrap-tipo'].style.display='none';
+    DOM['wrap-familia'].style.display='';
     msPopulate('fam',[...new Set(allSC.map(r=>r.tipo))].filter(Boolean).sort());
   }
 }
@@ -633,42 +632,40 @@ function setRefac(modo){
   if(modoRefac===modo)return;
   modoRefac=modo;
   selTipos.clear();selAlms.clear();selRows.clear();
-  document.getElementById('btn-prev').classList.toggle('active',modo==='prev');
-  document.getElementById('btn-corr').classList.toggle('active',modo==='corr');
+  DOM['btn-prev'].classList.toggle('active',modo==='prev');
+  DOM['btn-corr'].classList.toggle('active',modo==='corr');
   const isPrev=modo==='prev';
-  document.getElementById('k-mat-lbl').textContent=isPrev?'Materiales preventivos':'Materiales correctivos';
-  document.getElementById('k-exist-sub').textContent=isPrev?'Piezas preventivas':'Piezas correctivas';
-  document.getElementById('k-sc-lbl').textContent=isPrev?'Correctivos':'Preventivos';
-  document.getElementById('ttl-chart-tipos').textContent=isPrev?'Existencias por Tipo de Mantenimiento':'Existencias por '+(familiaCol||'Clasificación');
-  const th=document.getElementById('th-tipo');
-  if(th)th.textContent=isPrev?'Tipo de Mantenimiento':(familiaCol||'Familia');
-  document.getElementById('f-exist').value='';
+  DOM['k-mat-lbl'].textContent=isPrev?'Materiales preventivos':'Materiales correctivos';
+  DOM['k-exist-sub'].textContent=isPrev?'Piezas preventivas':'Piezas correctivas';
+  DOM['k-sc-lbl'].textContent=isPrev?'Correctivos':'Preventivos';
+  DOM['ttl-chart-tipos'].textContent=isPrev?'Existencias por Tipo de Mantenimiento':'Existencias por '+(familiaCol||'Clasificación');
+  if(DOM['th-tipo'])DOM['th-tipo'].textContent=isPrev?'Tipo de Mantenimiento':(familiaCol||'Familia');
+  DOM['f-exist'].value='';
   populateFilters();
   applyFilters();
 }
 
 function applyFilters(){
-  const sAlm=MS.alm.sel, sClas=MS.clas.sel, sFam=MS.fam.sel;
-  const exist=document.getElementById('f-exist').value;
-  const srch=document.getElementById('search').value.toLowerCase();
+  const sAlm=MS.alm.sel, sClas=MS.clas.sel, sFam=MS.fam.sel, sTnec=MS.tnec.sel;
+  const exist=DOM['f-exist'].value;
+  const srch=DOM['search'].value.toLowerCase();
   const filt=(rows,extraFn)=>{
-    let r=[...rows];
+    let r=rows;
     if(sAlm.size>0){if(sAlm.has('__none__'))r=[];else r=r.filter(x=>sAlm.has(x.almacen));}
     if(exist==='con')r=r.filter(x=>x.existencia>0);
-    if(exist==='sin')r=r.filter(x=>x.existencia<=0);
+    else if(exist==='sin')r=r.filter(x=>x.existencia<=0);
     if(sClas.size>0){if(sClas.has('__none__'))r=[];else r=r.filter(x=>sClas.has(x.clasif));}
-    const sTnec=MS.tnec.sel;
     if(sTnec.size>0){if(sTnec.has('__none__'))r=[];else r=r.filter(x=>sTnec.has(x.tnec));}
     if(srch)r=r.filter(x=>x.codigo.toLowerCase().includes(srch)||x.desc.toLowerCase().includes(srch)||x.tipo.toLowerCase().includes(srch)||x.almacen.toLowerCase().includes(srch));
     if(extraFn)r=r.filter(extraFn);
     return r;
   };
   if(modoRefac==='prev'){
-    const tipo=document.getElementById('f-tipo').value;
+    const tipo=DOM['f-tipo'].value;
     baseClas=filt(allClas,tipo?r=>r.tipo===tipo:null);
     baseSC=[...allSC];
   } else {
-    baseSC=filt(allSC,sFam.size>0?sFam.has('__none__')?r=>false:r=>sFam.has(r.tipo):null);
+    baseSC=filt(allSC,sFam.size>0?sFam.has('__none__')?()=>false:r=>sFam.has(r.tipo):null);
     baseClas=[...allClas];
   }
   selTipos.clear();selAlms.clear();selRows.clear();
@@ -678,51 +675,47 @@ function applyFilters(){
 // ══ RENDER PRINCIPAL ═════════════════════════════════════════
 function renderAll(){
   const activeRows=modoRefac==='prev'?baseClas:baseSC;
-  let biRows=[...activeRows];
+  let biRows=activeRows;
   if(selTipos.size>0)biRows=biRows.filter(r=>selTipos.has(r.tipo));
   if(selAlms.size>0)biRows=biRows.filter(r=>selAlms.has(r.almacen));
-
   const hasRowSel=selRows.size>0;
-  // Filas exactas seleccionadas en la tabla
   const selectedRows=hasRowSel?biRows.filter(r=>selRows.has(r.codigo)):biRows;
-
-  // Las gráficas usan: si hay selección de filas → solo esas filas
-  //                    si hay selección de barras → biRows filtrado por barras
-  //                    si no hay nada → activeRows completo
-  const chartSource = hasRowSel ? selectedRows : biRows;
-
-  // Para highlight en gráficas: derivar Sets de tipos/almacenes de las filas seleccionadas
-  const rowSelTipos = hasRowSel ? new Set(selectedRows.map(r=>r.tipo)) : selTipos;
-  const rowSelAlms  = hasRowSel ? new Set(selectedRows.map(r=>r.almacen)) : selAlms;
-
-  updateKPIs(activeRows, chartSource);
-  renderChartTipos(activeRows, rowSelTipos, rowSelAlms, hasRowSel ? selectedRows : null);
-  renderChartAlm(activeRows,   rowSelTipos, rowSelAlms, hasRowSel ? selectedRows : null);
-  renderTables(biRows, selectedRows);
+  const chartSource=hasRowSel?selectedRows:biRows;
+  const rowSelTipos=hasRowSel?new Set(selectedRows.map(r=>r.tipo)):selTipos;
+  const rowSelAlms =hasRowSel?new Set(selectedRows.map(r=>r.almacen)):selAlms;
+  updateKPIs(activeRows,chartSource);
+  renderChartTipos(activeRows,rowSelTipos,rowSelAlms,hasRowSel?selectedRows:null);
+  renderChartAlm(activeRows,rowSelTipos,rowSelAlms,hasRowSel?selectedRows:null);
+  renderTables(biRows,selectedRows);
   updateBIBadge();
   const hasSel=selTipos.size>0||selAlms.size>0||selRows.size>0;
-  ['card-tipos','card-alm','tcard'].forEach(id=>document.getElementById(id).classList.toggle('has-sel',hasSel));
+  ['card-tipos','card-alm','tcard'].forEach(id=>DOM[id].classList.toggle('has-sel',hasSel));
 }
 
 // ══ KPIs ═════════════════════════════════════════════════════
 function updateKPIsc(){
-  document.getElementById('k-sc').textContent=allSC.length.toLocaleString();
-  document.getElementById('k-sc-exist').textContent=allSC.reduce((a,r)=>a+r.existencia,0).toLocaleString('es-MX')+' piezas';
+  DOM['k-sc'].textContent=allSC.length.toLocaleString();
+  DOM['k-sc-exist'].textContent=allSC.reduce((a,r)=>a+r.existencia,0).toLocaleString('es-MX')+' piezas';
 }
 function updateKPIs(base,bi){
   const rows=(selTipos.size>0||selAlms.size>0||selRows.size>0)?bi:base;
-  const tot=rows.length, con=rows.filter(r=>r.existencia>0).length;
-  const exist=rows.reduce((a,r)=>a+r.existencia,0);
-  const tipos=new Set(rows.map(r=>r.tipo)).size;
+  const tot=rows.length;
+  let con=0,exist=0;
+  const tiposU=new Set();
+  for(const r of rows){
+    if(r.existencia>0)con++;
+    exist+=r.existencia;
+    tiposU.add(r.tipo);
+  }
   const lbl=modoRefac==='prev'?'tipo(s) preventivo(s)':'familia(s)';
-  document.getElementById('k-mat').textContent=tot.toLocaleString();
-  document.getElementById('k-tipos-sub').textContent=tipos+' '+lbl;
-  document.getElementById('k-exist').textContent=exist.toLocaleString('es-MX');
-  document.getElementById('k-con').textContent=con.toLocaleString();
-  document.getElementById('k-con-p').textContent=tot?(con/tot*100).toFixed(1)+'% del total':'—';
-  document.getElementById('k-sin').textContent=(tot-con).toLocaleString();
-  document.getElementById('k-sin-p').textContent=tot?((tot-con)/tot*100).toFixed(1)+'% del total':'—';
-  document.getElementById('kpi-mat').classList.toggle('hi',selTipos.size>0||selAlms.size>0||selRows.size>0);
+  DOM['k-mat'].textContent=tot.toLocaleString();
+  DOM['k-tipos-sub'].textContent=tiposU.size+' '+lbl;
+  DOM['k-exist'].textContent=exist.toLocaleString('es-MX');
+  DOM['k-con'].textContent=con.toLocaleString();
+  DOM['k-con-p'].textContent=tot?(con/tot*100).toFixed(1)+'% del total':'—';
+  DOM['k-sin'].textContent=(tot-con).toLocaleString();
+  DOM['k-sin-p'].textContent=tot?((tot-con)/tot*100).toFixed(1)+'% del total':'—';
+  DOM['kpi-mat'].classList.toggle('hi',selTipos.size>0||selAlms.size>0||selRows.size>0);
 }
 
 // ══ GRÁFICAS SVG ═════════════════════════════════════════════
@@ -732,7 +725,7 @@ function renderChartTipos(rows,sTipos,sAlms,rowData){
   const tm={};
   for(const r of src)tm[r.tipo]=(tm[r.tipo]||0)+r.existencia;
   const data=Object.entries(tm).sort((a,b)=>b[1]-a[1]).map(([l,v],i)=>({l,v,c:PAL[i%PAL.length]}));
-  const ct=document.getElementById('chart-tipos');
+  const ct=DOM['chart-tipos'];
   if(!data.length){ct.innerHTML='<p style="padding:16px;font-size:12px;color:var(--tx3)">Sin datos</p>';return;}
   const anyT=sTipos&&sTipos.size>0, maxV=Math.max(...data.map(d=>d.v));
   const LW=148,BW=148,VW=60,PH=30,PV=14,W=LW+BW+VW,H=data.length*PH+PV*2;
@@ -772,7 +765,7 @@ function renderChartAlm(rows,sTipos,sAlms,rowData){
 
   const data=allAlms.map(alm=>({l:alm, v:amSrc[alm]||0, c:almColor[alm]}));
 
-  const ca=document.getElementById('chart-alm');
+  const ca=DOM['chart-alm'];
   if(!data.length){ca.innerHTML='<p style="padding:16px;font-size:12px;color:var(--tx3)">Sin datos</p>';return;}
 
   const anyA=sAlms&&sAlms.size>0;
@@ -827,7 +820,16 @@ function onRowClick(evt,key){
 }
 function clearBISelection(){selTipos.clear();selAlms.clear();selRows.clear();renderAll();}
 function updateBIBadge(){
-  const badge=document.getElementById('active-filter'),parts=[];
+  const badge=DOM['active-filter'],parts=[];
+  if(selTipos.size===1)parts.push([...selTipos][0]);else if(selTipos.size>1)parts.push(selTipos.size+' tipos');
+  if(selAlms.size===1)parts.push([...selAlms][0]);else if(selAlms.size>1)parts.push(selAlms.size+' almacenes');
+  if(selRows.size>0)parts.push(selRows.size+(selRows.size===1?' código':' códigos'));
+  badge.style.display=parts.length?'inline-block':'none';
+  if(parts.length)badge.textContent='✕ '+parts.join(' · ');
+}
+
+function updateBIBadge(){
+  const badge=DOM['active-filter'], parts=[];
   if(selTipos.size===1)parts.push([...selTipos][0]);else if(selTipos.size>1)parts.push(selTipos.size+' tipos');
   if(selAlms.size===1)parts.push([...selAlms][0]);else if(selAlms.size>1)parts.push(selAlms.size+' almacenes');
   if(selRows.size>0)parts.push(selRows.size+(selRows.size===1?' código':' códigos'));
@@ -842,67 +844,50 @@ function setActiveTab(t){
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.tc').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll(`.tab[data-t="${t}"]`).forEach(x=>x.classList.add('active'));
-  document.getElementById('tc-'+t).classList.add('active');
+  $('tc-'+t).classList.add('active');
 }
 
-function renderTables(rows, tableRows){
+function renderTables(rows,tableRows){
   const disp=tableRows&&tableRows.length>0?tableRows:rows;
   window._exportRows=disp;
   const hasSel=selRows.size>0;
-  const cnt=rows.length+(hasSel?' ('+selRows.size+(selRows.size===1?' cód. sel.)':' cód. sel.)'):'');
-  document.getElementById('table-count').textContent=cnt+' registros';
-  // Detalle
-  document.getElementById('tb-det').innerHTML=rows.slice(0,600).map(r=>{
+  DOM['table-count'].textContent=rows.length+(hasSel?' ('+selRows.size+(selRows.size===1?' cód. sel.)':' cód. sel.)'):'')+ ' registros';
+  // Tabla detalle — máx 600 filas, usa innerHTML acumulado en array (join más rápido que concatenar)
+  const detParts=[];
+  const limit=Math.min(rows.length,600);
+  for(let i=0;i<limit;i++){
+    const r=rows[i];
     const key=r.codigo, isSel=selRows.has(key), isDim=hasSel&&!isSel;
-    return `<tr class="${isSel?'row-selected':isDim?'row-dimmed':''}" onclick="onRowClick(event,'${key.replace(/'/g,"\'")}')">
-    <td><code style="font-size:11px;background:var(--surf2);padding:1px 4px;border-radius:3px">${r.codigo}</code></td>
-    <td title="${r.desc}">${r.desc||'—'}</td>
-    <td><span class="badge ${badgeClass(r.tipo)}">${r.tipo}</span></td>
-    <td>${r.almacen}</td>
-    <td><span style="font-size:11px;color:var(--tx2)">${r.clasif||'—'}</span></td>
-    <td><span style="font-size:11px;color:var(--tx2)">${r.tnec||'—'}</span></td>
-    <td style="text-align:right"><span class="badge ${r.existencia>0?'b-green':'b-red'}">${r.existencia.toLocaleString('es-MX')}</span></td>
-    </tr>`;
-  }).join('');
-  // Resumen por tipo
+    detParts.push(`<tr class="${isSel?'row-selected':isDim?'row-dimmed':''}" onclick="onRowClick(event,'${key.replace(/'/g,"\'")}')"><td><code style="font-size:11px;background:var(--surf2);padding:1px 4px;border-radius:3px">${r.codigo}</code></td><td title="${r.desc}">${r.desc||'—'}</td><td><span class="badge ${badgeClass(r.tipo)}">${r.tipo}</span></td><td>${r.almacen}</td><td><span style="font-size:11px;color:var(--tx2)">${r.clasif||'—'}</span></td><td><span style="font-size:11px;color:var(--tx2)">${r.tnec||'—'}</span></td><td style="text-align:right"><span class="badge ${r.existencia>0?'b-green':'b-red'}">${r.existencia.toLocaleString('es-MX')}</span></td></tr>`);
+  }
+  DOM['tb-det'].innerHTML=detParts.join('');
+  // Resumen por tipo — un solo loop
   const rm={};
   for(const r of rows){
     if(!rm[r.tipo])rm[r.tipo]={tot:0,con:0,sin:0,exist:0};
     rm[r.tipo].tot++;
     if(r.existencia>0){rm[r.tipo].con++;rm[r.tipo].exist+=r.existencia;}else rm[r.tipo].sin++;
   }
-  document.getElementById('tb-res').innerHTML=Object.entries(rm)
+  DOM['tb-res'].innerHTML=Object.entries(rm)
     .sort((a,b)=>{if(a[0]==='Sin clasificar')return 1;if(b[0]==='Sin clasificar')return -1;return b[1].exist-a[1].exist;})
     .map(([tipo,d])=>{
       const pct=d.tot?Math.round(d.con/d.tot*100):0;
       const fc=pct>=80?'#2d6a0f':pct>=40?'#7a4800':'#a32d2d';
       const isSel=selRows.size>0&&[...selRows].some(k=>k.split('||')[0]==='__tipo__'+tipo);
-      return `<tr class="${isSel?'row-selected':''}" style="${tipo==='Sin clasificar'?'background:var(--amber-bg)':''}" onclick="onTipoRowClick(event,'${tipo.replace(/'/g,"\'")}')">
-      <td><span class="badge ${badgeClass(tipo)}">${tipo}</span></td>
-      <td style="text-align:right;font-weight:600">${d.tot}</td>
-      <td style="text-align:right;color:var(--green)">${d.con}</td>
-      <td style="text-align:right;color:var(--red)">${d.sin}</td>
-      <td><div class="prog"><div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${fc}"></div></div><span class="prog-val">${pct}%</span></div></td>
-      <td style="text-align:right">${d.exist.toLocaleString('es-MX')}</td>
-      </tr>`;
+      return `<tr class="${isSel?'row-selected':''}" style="${tipo==='Sin clasificar'?'background:var(--amber-bg)':''}" onclick="onTipoRowClick(event,'${tipo.replace(/'/g,"\'")}')"><td><span class="badge ${badgeClass(tipo)}">${tipo}</span></td><td style="text-align:right;font-weight:600">${d.tot}</td><td style="text-align:right;color:var(--green)">${d.con}</td><td style="text-align:right;color:var(--red)">${d.sin}</td><td><div class="prog"><div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${fc}"></div></div><span class="prog-val">${pct}%</span></div></td><td style="text-align:right">${d.exist.toLocaleString('es-MX')}</td></tr>`;
     }).join('');
-  // Por almacén
+  // Por almacén — un solo loop
   const am={};
   for(const r of rows){
     const k=r.almacen+'||'+r.tipo;
     if(!am[k])am[k]={alm:r.almacen,tipo:r.tipo,cnt:0,exist:0};
     am[k].cnt++;am[k].exist+=r.existencia;
   }
-  document.getElementById('tb-alm').innerHTML=Object.values(am)
+  DOM['tb-alm'].innerHTML=Object.values(am)
     .sort((a,b)=>a.alm.localeCompare(b.alm)||b.exist-a.exist)
     .map(e=>{
       const isSel=selAlms.has(e.alm)||selTipos.has(e.tipo);
-      return `<tr class="${isSel?'row-selected':''}" onclick="onAlmRowClick(event,'${e.alm.replace(/'/g,"\'")}','${e.tipo.replace(/'/g,"\'")}')">
-      <td style="font-weight:500">${e.alm}</td>
-      <td><span class="badge ${badgeClass(e.tipo)}">${e.tipo}</span></td>
-      <td style="text-align:right">${e.cnt}</td>
-      <td style="text-align:right">${e.exist.toLocaleString('es-MX')}</td>
-      </tr>`;
+      return `<tr class="${isSel?'row-selected':''}" onclick="onAlmRowClick(event,'${e.alm.replace(/'/g,"\'")}','${e.tipo.replace(/'/g,"\'")}')"><td style="font-weight:500">${e.alm}</td><td><span class="badge ${badgeClass(e.tipo)}">${e.tipo}</span></td><td style="text-align:right">${e.cnt}</td><td style="text-align:right">${e.exist.toLocaleString('es-MX')}</td></tr>`;
     }).join('');
 }
 
@@ -979,10 +964,14 @@ function exportTabla(tab){
 
 // ══ EVENTOS ══════════════════════════════════════════════════
 ['f-tipo','f-exist'].forEach(id=>{
-  const el=document.getElementById(id);
+  const el=$(id);
   if(el)el.addEventListener('change',()=>{if(allClas.length||allSC.length)applyFilters();});
 });
-document.getElementById('search').addEventListener('input',()=>{if(allClas.length)applyFilters();});
+// Debounce en búsqueda: espera 200ms tras dejar de escribir antes de filtrar
+$('search').addEventListener('input',()=>{
+  clearTimeout(_searchTimer);
+  _searchTimer=setTimeout(()=>{if(allClas.length)applyFilters();},200);
+});
 
 init();
 </script>
