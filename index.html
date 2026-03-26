@@ -384,7 +384,10 @@ const MS={
   tnec:{sel:new Set(),opts:[],badgeId:'tnec-badge',txtId:'ms-tnec-txt',inpId:'ms-tnec-inp',optsId:'ms-tnec-options'}
 };
 
-function msPopulate(k,opts){MS[k].opts=opts;MS[k].sel.clear();msRender(k);msTxt(k);}
+// sel vacío = "todos" (no filtra). sel con '__none__' = ninguno. sel con valores = solo esos.
+function msPopulate(k,opts){
+  MS[k].opts=opts; MS[k].sel.clear(); msRender(k); msTxt(k);
+}
 
 function msRender(k){
   const s=MS[k], q=($(s.inpId)||{}).value||'';
@@ -396,7 +399,7 @@ function msRender(k){
     const chk=s.sel.size===0||s.sel.has(o);
     const id='mso-'+k+'-'+o.replace(/\W/g,'_');
     const div=document.createElement('div'); div.className='ms-opt';
-    div.innerHTML=`<input type="checkbox" id="${id}" value="${o}"${chk?' checked':''}onchange="msChg('${k}',this)"><label for="${id}">${o}</label>`;
+    div.innerHTML=`<input type="checkbox" id="${id}" value="${o}"${chk?' checked':''} onchange="msChg('${k}',this)"><label for="${id}">${o}</label>`;
     frag.appendChild(div);
   }
   el.innerHTML=''; el.appendChild(frag);
@@ -404,25 +407,31 @@ function msRender(k){
 
 function msChg(k,el){
   const s=MS[k];
-  if(el.checked){s.sel.add(el.value);}
-  else{
-    if(s.sel.size===0){s.opts.forEach(o=>{if(o!==el.value)s.sel.add(o);});}
+  if(el.checked){
+    s.sel.add(el.value);
+    if(s.sel.size===s.opts.length) s.sel.clear(); // todos marcados → volver a "todos"
+  } else {
+    if(s.sel.size===0) s.opts.forEach(o=>{if(o!==el.value) s.sel.add(o);}); // expandir desde "todos"
     else s.sel.delete(el.value);
+    if(s.sel.size===0) s.sel.add('__none__'); // desmarcó el último → ninguno
   }
-  if(s.sel.size===s.opts.length)s.sel.clear();
   msTxt(k); msFilter();
 }
 
-function msAll(k,e){e.stopPropagation();MS[k].sel.clear();msRender(k);msTxt(k);msFilter();}
-function msNone(k,e){e.stopPropagation();MS[k].sel=new Set(['__none__']);msRender(k);msTxt(k);msFilter();}
+function msAll(k,e){
+  e.stopPropagation(); MS[k].sel.clear(); msRender(k); msTxt(k); msFilter();
+}
+function msNone(k,e){
+  e.stopPropagation(); MS[k].sel=new Set(['__none__']); msRender(k); msTxt(k); msFilter();
+}
 
 function msTxt(k){
   const s=MS[k];
   const txt=$(s.txtId), badge=$(s.badgeId);
   if(!txt) return;
-  if(s.sel.size===0){txt.textContent='Todos';if(badge)badge.style.display='none';}
-  else if(s.sel.has('__none__')){txt.textContent='Ninguno';if(badge)badge.style.display='none';}
-  else{const n=s.sel.size;txt.textContent=n===1?[...s.sel][0]:n+' selec.';if(badge){badge.textContent=n;badge.style.display='inline-block';}}
+  if(s.sel.size===0){txt.textContent='Todos'; if(badge) badge.style.display='none';}
+  else if(s.sel.has('__none__')){txt.textContent='Ninguno'; if(badge) badge.style.display='none';}
+  else{const n=s.sel.size; txt.textContent=n===1?[...s.sel][0]:n+' selec.'; if(badge){badge.textContent=n; badge.style.display='inline-block';}}
 }
 
 function msToggle(k,e){
@@ -651,13 +660,23 @@ function applyFilters(){
   const srch=DOM['search'].value.toLowerCase();
   const filt=(rows,extraFn)=>{
     let r=rows;
+    // Almacén
     if(sAlm.size>0){if(sAlm.has('__none__'))r=[];else r=r.filter(x=>sAlm.has(x.almacen));}
-    if(exist==='con')r=r.filter(x=>x.existencia>0);
-    else if(exist==='sin')r=r.filter(x=>x.existencia<=0);
-    if(sClas.size>0){if(sClas.has('__none__'))r=[];else r=r.filter(x=>sClas.has(x.clasif));}
-    if(sTnec.size>0){if(sTnec.has('__none__'))r=[];else r=r.filter(x=>sTnec.has(x.tnec));}
-    if(srch)r=r.filter(x=>x.codigo.toLowerCase().includes(srch)||x.desc.toLowerCase().includes(srch)||x.tipo.toLowerCase().includes(srch)||x.almacen.toLowerCase().includes(srch));
-    if(extraFn)r=r.filter(extraFn);
+    // Existencia
+    if(exist==='con') r=r.filter(x=>x.existencia>0);
+    else if(exist==='sin') r=r.filter(x=>x.existencia<=0);
+    // Clasificación — filas con clasif vacío siempre pasan (no tienen clasificación asignada)
+    if(sClas.size>0){
+      if(sClas.has('__none__')) r=[];
+      else r=r.filter(x=>!x.clasif||sClas.has(x.clasif));
+    }
+    // Tipo de Necesidad — igual: filas sin tnec siempre pasan
+    if(sTnec.size>0){
+      if(sTnec.has('__none__')) r=[];
+      else r=r.filter(x=>!x.tnec||sTnec.has(x.tnec));
+    }
+    if(srch) r=r.filter(x=>x.codigo.toLowerCase().includes(srch)||x.desc.toLowerCase().includes(srch)||x.tipo.toLowerCase().includes(srch)||x.almacen.toLowerCase().includes(srch));
+    if(extraFn) r=r.filter(extraFn);
     return r;
   };
   if(modoRefac==='prev'){
@@ -668,7 +687,7 @@ function applyFilters(){
     baseSC=filt(allSC,sFam.size>0?sFam.has('__none__')?()=>false:r=>sFam.has(r.tipo):null);
     baseClas=[...allClas];
   }
-  selTipos.clear();selAlms.clear();selRows.clear();
+  selTipos.clear(); selAlms.clear(); selRows.clear();
   renderAll();
 }
 
