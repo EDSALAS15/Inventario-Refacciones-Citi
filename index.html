@@ -744,9 +744,16 @@ function applyFilters(){
 // ══ RENDER PRINCIPAL ═════════════════════════════════════════
 function renderAll(){
   const activeRows=modoRefac==='prev'?baseClas:baseSC;
-  // Universo completo (sin filtro de almacén) para mantener tamaño de gráfica
-  const fullRows=modoRefac==='prev'?allClas:allSC;
 
+  // Universo de columnas para la gráfica de almacén:
+  // - Si hay filtro sidebar de almacén → solo los almacenes filtrados (activeRows)
+  //   para que la gráfica muestre únicamente las barras relevantes con altura real.
+  // - Si no hay filtro de almacén → universo completo para mantener columnas estables
+  //   al aplicar otros filtros (tipo, existencia, etc.).
+  const sidebarAlmActivo = MS.alm.sel.size>0 && !MS.alm.sel.has('__none__');
+  const almUniverse = sidebarAlmActivo ? activeRows : (modoRefac==='prev'?allClas:allSC);
+
+  // Filas BI (clic en gráfica): aplicar sobre activeRows
   let biRows=activeRows;
   if(selTipos.size>0) biRows=biRows.filter(r=>selTipos.has(r.tipo));
   if(selAlms.size>0)  biRows=biRows.filter(r=>selAlms.has(r.almacen));
@@ -757,18 +764,15 @@ function renderAll(){
   const rowSelTipos=hasRowSel?new Set(selectedRows.map(r=>r.tipo)):selTipos;
   const rowSelAlms =hasRowSel?new Set(selectedRows.map(r=>r.almacen)):selAlms;
 
-  // Highlight de sidebar: si el filtro alm tiene selección, resaltar esas barras
-  const sidebarAlms=MS.alm.sel.size>0&&!MS.alm.sel.has('__none__')?MS.alm.sel:null;
+  // Highlight de almacén en gráfica: clic en barra (BI) tiene prioridad sobre sidebar
+  const almHighlight = rowSelAlms.size>0 ? rowSelAlms : new Set();
 
   updateKPIs(activeRows,chartSource);
   renderChartTipos(activeRows,rowSelTipos,rowSelAlms,hasRowSel?selectedRows:null);
-  // La gráfica de almacén siempre recibe el universo completo de filas (sin filtro alm)
-  // para mantener tamaño fijo; el highlight combina BI + sidebar
-  const almHighlight = rowSelAlms.size>0 ? rowSelAlms : (sidebarAlms || new Set());
-  renderChartAlm(fullRows, rowSelTipos, almHighlight, hasRowSel?selectedRows:null);
+  renderChartAlm(activeRows, almUniverse, rowSelTipos, almHighlight, hasRowSel?selectedRows:null);
   renderTables(biRows,selectedRows);
   updateBIBadge();
-  const hasSel=selTipos.size>0||selAlms.size>0||selRows.size>0||MS.alm.sel.size>0;
+  const hasSel=selTipos.size>0||selAlms.size>0||selRows.size>0||sidebarAlmActivo;
   ['card-tipos','card-alm','tcard'].forEach(id=>DOM[id].classList.toggle('has-sel',hasSel));
 }
 
@@ -824,34 +828,48 @@ function renderChartTipos(rows,sTipos,sAlms,rowData){
 <text x="${W-2}" y="10" text-anchor="end" font-size="9" fill="var(--tx3)">Ctrl+clic = multi</text>${bars}</svg>`;
 }
 
-function renderChartAlm(rows,sTipos,sAlms,rowData){
-  const src=rowData ? rowData : (sTipos&&sTipos.size>0?rows.filter(r=>sTipos.has(r.tipo)):rows);
+// renderChartAlm(rows, almUniverse, sTipos, sAlms, rowData)
+//   rows        → filas ya filtradas por sidebar (tipo, exist, clas, tnec)
+//                 determinan la ALTURA de cada barra
+//   almUniverse → universo completo de almacenes del modo actual
+//                 determina qué COLUMNAS se dibujan (tamaño fijo)
+//   sTipos      → highlight de tipo (BI)
+//   sAlms       → highlight de almacén (BI o sidebar)
+//   rowData     → selección de filas en tabla (BI de tabla)
+function renderChartAlm(rows, almUniverse, sTipos, sAlms, rowData){
+  // Fuente de datos para calcular alturas:
+  // si hay selección de filas en tabla → esas filas
+  // si hay highlight de tipo → filtrar por tipo
+  // si no → todas las filas filtradas por sidebar
+  const src=rowData ? rowData : (sTipos&&sTipos.size>0 ? rows.filter(r=>sTipos.has(r.tipo)) : rows);
   window._almExportRows=src;
 
-  // Construir mapa de existencias del contexto filtrado (src)
+  // Mapa de existencias por almacén (de las filas filtradas)
   const amSrc={};
   for(const r of src) amSrc[r.almacen]=(amSrc[r.almacen]||0)+r.existencia;
 
-  // Siempre mostrar TODOS los almacenes del contexto base (rows),
-  // rellenando con 0 los que no aparecen en src
-  const allAlms=[...new Set(rows.map(r=>r.almacen))].sort((a,b)=>{
+  // Lista de almacenes: siempre del universo completo para mantener columnas fijas.
+  // Ordenar por existencia del contexto filtrado (mayor primero), luego alfabético.
+  const allAlms=[...new Set(almUniverse.map(r=>r.almacen))].sort((a,b)=>{
     const va=amSrc[a]||0, vb=amSrc[b]||0;
     return vb-va || a.localeCompare(b);
   });
 
-  // Paleta fija por almacén para que no cambie de color al filtrar
+  // Paleta fija por posición para que los colores no cambien al filtrar
   const almColor={};
   allAlms.forEach((a,i)=>almColor[a]=PAL[i%PAL.length]);
 
+  // data: siempre todos los almacenes; v=0 si el filtro no los incluye
   const data=allAlms.map(alm=>({l:alm, v:amSrc[alm]||0, c:almColor[alm]}));
 
   const ca=DOM['chart-alm'];
   if(!data.length){ca.innerHTML='<p style="padding:16px;font-size:12px;color:var(--tx3)">Sin datos</p>';return;}
 
   const anyA=sAlms&&sAlms.size>0;
-  const maxV=Math.max(...data.map(d=>d.v),1); // mínimo 1 para evitar div/0
+  // maxV sobre las barras del contexto filtrado (no 0) para escalar bien
+  const maxV=Math.max(...data.map(d=>d.v),1);
 
-  // Tamaño FIJO independiente de cuántas barras haya datos
+  // Dimensiones fijas
   const CW=34,GAP=5,PL=6,PR=6,PT=28,PB=58,BH=110;
   const W=PL+(CW+GAP)*data.length+PR, H=BH+PT+PB;
 
@@ -862,7 +880,6 @@ function renderChartAlm(rows,sTipos,sAlms,rowData){
     const isEmpty=d.v===0;
     const lbl=d.l.includes('–')?d.l.split('–')[0].trim():d.l.slice(0,5);
     const sub=d.l.includes('–')?d.l.split('–')[1].trim():'';
-    // Barra vacía: línea base punteada
     const barEl=isEmpty
       ? `<rect x="${x}" y="${PT+BH-1}" width="${CW}" height="2" rx="1" fill="${d.c}" opacity="0.2"/>`
       : `<rect class="bar-rect" x="${x}" y="${y}" width="${CW}" height="${bh}" rx="3" fill="${d.c}" opacity="${isDim?.25:.88}"${isSel?` stroke="${d.c}" stroke-width="1.5"`:''}/>`;
