@@ -132,8 +132,7 @@ tbody tr.row-selected td{color:var(--blue-tx);}
 .f-body.open{display:block;}
 /* Caja de opciones */
 .ms-box{background:var(--surf2);border:.5px solid var(--bord);border-radius:6px;overflow:hidden;}
-.ms-search-inp{width:100%;padding:5px 8px;font-size:11px;border:none;border-bottom:.5px solid var(--bord);background:var(--surf2);color:var(--tx);outline:none;box-sizing:border-box;}
-.ms-search-inp::placeholder{color:var(--tx3);}
+/* buscadores eliminados */
 .ms-options{max-height:140px;overflow-y:auto;}
 .ms-opt{display:flex;align-items:center;gap:7px;padding:4px 8px;font-size:11px;cursor:pointer;transition:background .1s;}
 .ms-opt:hover{background:var(--surf);}
@@ -193,23 +192,23 @@ tbody tr.row-selected td{color:var(--blue-tx);}
           </div>
         </div>
         <div class="f-body open" id="f-body-alm">
-          <div class="ms-box">
-            <input class="ms-search-inp" id="ms-alm-inp" type="text" placeholder="Buscar almacén..." oninput="msRender('alm')">
-            <div class="ms-options" id="ms-alm-options"></div>
-          </div>
+          <div class="ms-box"><div class="ms-options" id="ms-alm-options"></div></div>
         </div>
       </div>
-      <!-- Tipo de Mantenimiento (select nativo) -->
+      <!-- Tipo de Mantenimiento (checkbox MS) -->
       <div id="wrap-tipo">
         <div class="f-hdr" onclick="fToggle('tipo')">
           <span class="f-hdr-lbl">Tipo de Mantenimiento</span>
-          <span class="f-hdr-arr open" id="f-arr-tipo">▼</span>
+          <div class="f-hdr-right">
+            <span class="f-hdr-badge" id="f-badge-tipo"></span>
+            <span class="f-hdr-arr open" id="f-arr-tipo">▼</span>
+          </div>
         </div>
         <div class="f-body open" id="f-body-tipo">
-          <select id="f-tipo"><option value="">Todos los tipos</option></select>
+          <div class="ms-box"><div class="ms-options" id="ms-tipo-options"></div></div>
         </div>
       </div>
-      <!-- Familia (modo correctivos) -->
+      <!-- Familia (modo correctivos, checkbox MS) -->
       <div id="wrap-familia" style="display:none">
         <div class="f-hdr" onclick="fToggle('fam')">
           <span class="f-hdr-lbl"><span id="lbl-familia">Familia</span></span>
@@ -219,24 +218,20 @@ tbody tr.row-selected td{color:var(--blue-tx);}
           </div>
         </div>
         <div class="f-body open" id="f-body-fam">
-          <div class="ms-box">
-            <input class="ms-search-inp" id="ms-fam-inp" type="text" placeholder="Buscar familia..." oninput="msRender('fam')">
-            <div class="ms-options" id="ms-fam-options"></div>
-          </div>
+          <div class="ms-box"><div class="ms-options" id="ms-fam-options"></div></div>
         </div>
       </div>
-      <!-- Existencia -->
+      <!-- Existencia (checkbox MS) -->
       <div>
         <div class="f-hdr" onclick="fToggle('exist')">
           <span class="f-hdr-lbl">Existencia</span>
-          <span class="f-hdr-arr open" id="f-arr-exist">▼</span>
+          <div class="f-hdr-right">
+            <span class="f-hdr-badge" id="f-badge-exist"></span>
+            <span class="f-hdr-arr open" id="f-arr-exist">▼</span>
+          </div>
         </div>
         <div class="f-body open" id="f-body-exist">
-          <select id="f-exist">
-            <option value="">Todos</option>
-            <option value="con">Con existencia</option>
-            <option value="sin">Sin existencia</option>
-          </select>
+          <div class="ms-box"><div class="ms-options" id="ms-exist-options"></div></div>
         </div>
       </div>
       <!-- Clasificación -->
@@ -249,10 +244,7 @@ tbody tr.row-selected td{color:var(--blue-tx);}
           </div>
         </div>
         <div class="f-body open" id="f-body-clas">
-          <div class="ms-box">
-            <input class="ms-search-inp" id="ms-clas-inp" type="text" placeholder="Buscar clasificación..." oninput="msRender('clas')">
-            <div class="ms-options" id="ms-clas-options"></div>
-          </div>
+          <div class="ms-box"><div class="ms-options" id="ms-clas-options"></div></div>
         </div>
       </div>
       <!-- Tipo de Necesidad -->
@@ -265,10 +257,7 @@ tbody tr.row-selected td{color:var(--blue-tx);}
           </div>
         </div>
         <div class="f-body open" id="f-body-tnec">
-          <div class="ms-box">
-            <input class="ms-search-inp" id="ms-tnec-inp" type="text" placeholder="Buscar tipo..." oninput="msRender('tnec')">
-            <div class="ms-options" id="ms-tnec-options"></div>
-          </div>
+          <div class="ms-box"><div class="ms-options" id="ms-tnec-options"></div></div>
         </div>
       </div>
     </div>
@@ -366,16 +355,16 @@ function badgeClass(t){if(t==='Sin clasificar'||t==='Correctivo')return 'b-gray'
 const $ = id => document.getElementById(id);
 const DOM = {};
 function cacheDOM(){
-  ['ts','dot-inv','st-inv','btn-inv','btn-reset','empty','dash','f-exist',
+  ['ts','dot-inv','st-inv','btn-inv','btn-reset','empty','dash',
    'search','table-count','tb-det','tb-res','tb-alm','chart-tipos','chart-alm',
    'k-mat','k-mat-lbl','k-tipos-sub','k-exist','k-exist-sub','k-con','k-con-p',
    'k-sin','k-sin-p','k-sc','k-sc-lbl','k-sc-exist','kpi-mat',
    'active-filter','card-tipos','card-alm','tcard','th-tipo',
-   'ttl-chart-tipos','lbl-familia','wrap-tipo','wrap-familia','f-tipo',
+   'ttl-chart-tipos','lbl-familia','wrap-tipo','wrap-familia',
    'btn-prev','btn-corr',
    'ms-alm-options','ms-fam-options','ms-clas-options','ms-tnec-options',
-   'ms-alm-inp','ms-fam-inp','ms-clas-inp','ms-tnec-inp',
-   'f-badge-alm','f-badge-fam','f-badge-clas','f-badge-tnec',
+   'ms-tipo-options','ms-exist-options',
+   'f-badge-alm','f-badge-fam','f-badge-clas','f-badge-tnec','f-badge-tipo','f-badge-exist',
    'f-body-alm','f-body-fam','f-body-clas','f-body-tnec','f-body-tipo','f-body-exist',
    'f-arr-alm','f-arr-fam','f-arr-clas','f-arr-tnec','f-arr-tipo','f-arr-exist'
   ].forEach(id=>{DOM[id]=$(id);});
@@ -394,10 +383,12 @@ let modoRefac='prev', familiaCol='';
 // sel===Set{'__none__'} → ninguno
 // sel con valores reales → solo esos valores
 const MS={
-  alm: {sel:new Set(), opts:[], inpId:'ms-alm-inp', optsId:'ms-alm-options', badgeId:'f-badge-alm'},
-  fam: {sel:new Set(), opts:[], inpId:'ms-fam-inp', optsId:'ms-fam-options', badgeId:'f-badge-fam'},
-  clas:{sel:new Set(), opts:[], inpId:'ms-clas-inp', optsId:'ms-clas-options', badgeId:'f-badge-clas'},
-  tnec:{sel:new Set(), opts:[], inpId:'ms-tnec-inp', optsId:'ms-tnec-options', badgeId:'f-badge-tnec'}
+  alm: {sel:new Set(), opts:[], optsId:'ms-alm-options',  badgeId:'f-badge-alm'},
+  fam: {sel:new Set(), opts:[], optsId:'ms-fam-options',  badgeId:'f-badge-fam'},
+  clas:{sel:new Set(), opts:[], optsId:'ms-clas-options', badgeId:'f-badge-clas'},
+  tnec:{sel:new Set(), opts:[], optsId:'ms-tnec-options', badgeId:'f-badge-tnec'},
+  tipo:{sel:new Set(), opts:[], optsId:'ms-tipo-options', badgeId:'f-badge-tipo'},
+  exist:{sel:new Set(), opts:['Con existencia','Sin existencia'], optsId:'ms-exist-options', badgeId:'f-badge-exist'}
 };
 
 function msIsAll(k){ return MS[k].sel.size===0; }
@@ -423,20 +414,17 @@ function msPopulate(k, opts){
 
 function msRender(k){
   const s=MS[k];
-  const q=($(s.inpId)||{}).value||'';
-  const ql=q.toLowerCase();
-  const opts=q ? s.opts.filter(o=>o.toLowerCase().includes(ql)) : s.opts;
   const el=$(s.optsId); if(!el) return;
   const isAll=msIsAll(k);
   const frag=document.createDocumentFragment();
-  // Fila "Todos" — siempre visible, por encima del buscador
+  // Fila "Todos"
   const allDiv=document.createElement('div');
   allDiv.className='ms-opt ms-opt-all';
   allDiv.innerHTML=`<input type="checkbox" id="mso-${k}-__all__"${isAll?' checked':''} onchange="msChgAll('${k}',this)"><label for="mso-${k}-__all__">Todos</label>`;
   frag.appendChild(allDiv);
   // Opciones individuales
-  for(const o of opts){
-    const chk = isAll || s.sel.has(o);   // marcado si "todos" O si está en sel
+  for(const o of s.opts){
+    const chk=isAll||s.sel.has(o);
     const id='mso-'+k+'-'+o.replace(/\W/g,'_');
     const div=document.createElement('div'); div.className='ms-opt';
     div.innerHTML=`<input type="checkbox" id="${id}" value="${o}"${chk?' checked':''} onchange="msChg('${k}',this)"><label for="${id}">${o}</label>`;
@@ -507,13 +495,9 @@ function scheduleFilter(){
 }
 
 function clearAllFilters(){
-  ['alm','fam','clas','tnec'].forEach(k=>{
-    MS[k].sel.clear();
-    const inp=$(MS[k].inpId); if(inp) inp.value='';
-    msRender(k); msBadge(k);
+  ['alm','fam','clas','tnec','tipo','exist'].forEach(k=>{
+    MS[k].sel.clear(); msRender(k); msBadge(k);
   });
-  if(DOM['f-exist']) DOM['f-exist'].value='';
-  if(DOM['f-tipo'])  DOM['f-tipo'].value='';
   selTipos.clear(); selAlms.clear(); selRows.clear();
   applyFilters();
 }
@@ -692,13 +676,14 @@ function populateFilters(){
   if(modoRefac==='prev'){
     DOM['wrap-tipo'].style.display='';
     DOM['wrap-familia'].style.display='none';
-    const tipos=[...new Set(allClas.map(r=>r.tipo))].sort();
-    DOM['f-tipo'].innerHTML='<option value="">Todos los tipos</option>'+tipos.map(t=>`<option>${t}</option>`).join('');
+    msPopulate('tipo',[...new Set(allClas.map(r=>r.tipo))].sort());
   } else {
     DOM['wrap-tipo'].style.display='none';
     DOM['wrap-familia'].style.display='';
     msPopulate('fam',[...new Set(allSC.map(r=>r.tipo))].filter(Boolean).sort());
   }
+  // Existencia: opciones fijas, solo re-renderizar para reset
+  MS.exist.sel.clear(); msRender('exist'); msBadge('exist');
 }
 
 function setRefac(modo){
@@ -713,39 +698,40 @@ function setRefac(modo){
   DOM['k-sc-lbl'].textContent=isPrev?'Correctivos':'Preventivos';
   DOM['ttl-chart-tipos'].textContent=isPrev?'Existencias por Tipo de Mantenimiento':'Existencias por '+(familiaCol||'Clasificación');
   if(DOM['th-tipo'])DOM['th-tipo'].textContent=isPrev?'Tipo de Mantenimiento':(familiaCol||'Familia');
-  DOM['f-exist'].value='';
+  MS.exist.sel.clear(); msRender('exist'); msBadge('exist');
   populateFilters();
   applyFilters();
 }
 
 function applyFilters(){
-  const sAlm=MS.alm.sel, sClas=MS.clas.sel, sFam=MS.fam.sel, sTnec=MS.tnec.sel;
-  const exist=DOM['f-exist'].value;
+  const sAlm=MS.alm.sel, sClas=MS.clas.sel, sFam=MS.fam.sel;
+  const sTnec=MS.tnec.sel, sTipo=MS.tipo.sel, sExist=MS.exist.sel;
   const srch=DOM['search'].value.toLowerCase();
+
   const filt=(rows,extraFn)=>{
     let r=rows;
     // Almacén
     if(sAlm.size>0){if(sAlm.has('__none__'))r=[];else r=r.filter(x=>sAlm.has(x.almacen));}
-    // Existencia
-    if(exist==='con') r=r.filter(x=>x.existencia>0);
-    else if(exist==='sin') r=r.filter(x=>x.existencia<=0);
-    // Clasificación — filas con clasif vacío siempre pasan (no tienen clasificación asignada)
-    if(sClas.size>0){
-      if(sClas.has('__none__')) r=[];
-      else r=r.filter(x=>!x.clasif||sClas.has(x.clasif));
+    // Existencia (opciones fijas: 'Con existencia' / 'Sin existencia')
+    if(sExist.size>0 && !sExist.has('__none__')){
+      const conEx=sExist.has('Con existencia'), sinEx=sExist.has('Sin existencia');
+      if(conEx && !sinEx) r=r.filter(x=>x.existencia>0);
+      else if(sinEx && !conEx) r=r.filter(x=>x.existencia<=0);
+      // si ambas o ninguna → no filtra
     }
-    // Tipo de Necesidad — igual: filas sin tnec siempre pasan
-    if(sTnec.size>0){
-      if(sTnec.has('__none__')) r=[];
-      else r=r.filter(x=>!x.tnec||sTnec.has(x.tnec));
-    }
+    // Clasificación
+    if(sClas.size>0){if(sClas.has('__none__'))r=[];else r=r.filter(x=>!x.clasif||sClas.has(x.clasif));}
+    // Tipo de Necesidad
+    if(sTnec.size>0){if(sTnec.has('__none__'))r=[];else r=r.filter(x=>!x.tnec||sTnec.has(x.tnec));}
     if(srch) r=r.filter(x=>x.codigo.toLowerCase().includes(srch)||x.desc.toLowerCase().includes(srch)||x.tipo.toLowerCase().includes(srch)||x.almacen.toLowerCase().includes(srch));
     if(extraFn) r=r.filter(extraFn);
     return r;
   };
+
   if(modoRefac==='prev'){
-    const tipo=DOM['f-tipo'].value;
-    baseClas=filt(allClas,tipo?r=>r.tipo===tipo:null);
+    // Tipo de Mantenimiento como MS
+    const tipoFn=sTipo.size>0&&!sTipo.has('__none__') ? r=>sTipo.has(r.tipo) : null;
+    baseClas=filt(allClas,tipoFn);
     baseSC=[...allSC];
   } else {
     baseSC=filt(allSC,sFam.size>0?sFam.has('__none__')?()=>false:r=>sFam.has(r.tipo):null);
@@ -758,20 +744,31 @@ function applyFilters(){
 // ══ RENDER PRINCIPAL ═════════════════════════════════════════
 function renderAll(){
   const activeRows=modoRefac==='prev'?baseClas:baseSC;
+  // Universo completo (sin filtro de almacén) para mantener tamaño de gráfica
+  const fullRows=modoRefac==='prev'?allClas:allSC;
+
   let biRows=activeRows;
-  if(selTipos.size>0)biRows=biRows.filter(r=>selTipos.has(r.tipo));
-  if(selAlms.size>0)biRows=biRows.filter(r=>selAlms.has(r.almacen));
+  if(selTipos.size>0) biRows=biRows.filter(r=>selTipos.has(r.tipo));
+  if(selAlms.size>0)  biRows=biRows.filter(r=>selAlms.has(r.almacen));
+
   const hasRowSel=selRows.size>0;
   const selectedRows=hasRowSel?biRows.filter(r=>selRows.has(r.codigo)):biRows;
   const chartSource=hasRowSel?selectedRows:biRows;
   const rowSelTipos=hasRowSel?new Set(selectedRows.map(r=>r.tipo)):selTipos;
   const rowSelAlms =hasRowSel?new Set(selectedRows.map(r=>r.almacen)):selAlms;
+
+  // Highlight de sidebar: si el filtro alm tiene selección, resaltar esas barras
+  const sidebarAlms=MS.alm.sel.size>0&&!MS.alm.sel.has('__none__')?MS.alm.sel:null;
+
   updateKPIs(activeRows,chartSource);
   renderChartTipos(activeRows,rowSelTipos,rowSelAlms,hasRowSel?selectedRows:null);
-  renderChartAlm(activeRows,rowSelTipos,rowSelAlms,hasRowSel?selectedRows:null);
+  // La gráfica de almacén siempre recibe el universo completo de filas (sin filtro alm)
+  // para mantener tamaño fijo; el highlight combina BI + sidebar
+  const almHighlight = rowSelAlms.size>0 ? rowSelAlms : (sidebarAlms || new Set());
+  renderChartAlm(fullRows, rowSelTipos, almHighlight, hasRowSel?selectedRows:null);
   renderTables(biRows,selectedRows);
   updateBIBadge();
-  const hasSel=selTipos.size>0||selAlms.size>0||selRows.size>0;
+  const hasSel=selTipos.size>0||selAlms.size>0||selRows.size>0||MS.alm.sel.size>0;
   ['card-tipos','card-alm','tcard'].forEach(id=>DOM[id].classList.toggle('has-sel',hasSel));
 }
 
@@ -895,9 +892,11 @@ function onBarTipo(evt,tipo){
     if(selTipos.size===1&&selTipos.has(tipo)) selTipos.clear();
     else { selTipos.clear(); selTipos.add(tipo); }
   }
-  // Sincronizar con filtro sidebar de Tipo de Mantenimiento (f-tipo) si está en modo prev
-  if(modoRefac==='prev' && DOM['f-tipo']){
-    DOM['f-tipo'].value = selTipos.size===1 ? [...selTipos][0] : '';
+  // Sincronizar con filtro sidebar MS.tipo si está en modo prev
+  if(modoRefac==='prev'){
+    if(selTipos.size===0){ MS.tipo.sel.clear(); msRender('tipo'); msBadge('tipo'); }
+    else if(selTipos.size===1){ msSetSingle('tipo',[...selTipos][0]); }
+    else{ msSetMultiple('tipo',[...selTipos]); }
   }
   // Sincronizar con filtro sidebar de Familia si está en modo corr
   if(modoRefac==='corr'){
@@ -936,7 +935,7 @@ function clearBISelection(){
   selTipos.clear(); selAlms.clear(); selRows.clear();
   // Resetear filtros sidebar coordinados con BI
   MS.alm.sel.clear(); msRender('alm'); msBadge('alm');
-  if(modoRefac==='prev'&&DOM['f-tipo']) DOM['f-tipo'].value='';
+  if(modoRefac==='prev'){ MS.tipo.sel.clear(); msRender('tipo'); msBadge('tipo'); }
   if(modoRefac==='corr'){ MS.fam.sel.clear(); msRender('fam'); msBadge('fam'); }
   renderAll();
 }
