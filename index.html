@@ -465,17 +465,13 @@ async function clearStorage(){
 
 // ══ INIT ═════════════════════════════════════════════════════
 // ══ URL FUENTE DE DATOS ══════════════════════════════════════
-const _SRC='https://raw.githubusercontent.com/EDSALAS15/Inventario-Refacciones-Citi/main/InventarioAlmacen.xlsx';
+const _SRC='https://raw.githubusercontent.com/EDSALAS15/Inventario-Refacciones-Citi/main/InventarioAlmacenCarga.xlsx';
 
 // ══ PARSEO COMPARTIDO ════════════════════════════════════════
 function _applyWorkbook(wb){
-  const sName=wb.SheetNames.includes('InventarioAlmacenCarga')
-    ?'InventarioAlmacenCarga'
-    :wb.SheetNames.includes('InventarioAlmacen')
-      ?'InventarioAlmacen'
-      :wb.SheetNames[0];
+  const sName='InventarioAlmacen';
   invData=XLSX.utils.sheet_to_json(wb.Sheets[sName],{defval:''});
-  const mpSheet=wb.SheetNames.find(s=>/c[oó]digos|mp|mtto|cat[aá]logo/i.test(s)&&s!==sName)||wb.SheetNames.find(s=>s!==sName);
+  const mpSheet=wb.SheetNames.find(s=>s!==sName);
   const mpRows=mpSheet?XLSX.utils.sheet_to_json(wb.Sheets[mpSheet],{defval:''}):[]; 
   window._mpData=mpRows;
   save(K_INV,invData); save('inv_mp_v10',mpRows);
@@ -493,16 +489,16 @@ async function init(){
   try{
     const resp=await fetch(_SRC);
     if(!resp.ok) throw new Error('HTTP '+resp.status);
-    _applyWorkbook(XLSX.read(await resp.arrayBuffer(),{type:'array'}));
+    const buf=await resp.arrayBuffer();
+    _applyWorkbook(XLSX.read(buf,{type:'array'}));
   } catch(err){
     console.warn('Carga automática falló:',err.message);
-    // Fallback: datos guardados localmente
     invData=await load(K_INV);
     window._mpData=await load('inv_mp_v10')||[];
     const ts=await load(K_TS);
-    if(ts)document.getElementById('ts').textContent='Actualizado: '+ts;
+    if(ts) document.getElementById('ts').textContent='Actualizado: '+ts;
     updateStatus();
-    if(invData&&invData.length)buildAndRender();
+    if(invData&&invData.length) buildAndRender();
     else document.getElementById('st-inv').textContent='⚠️ Sin conexión — carga un archivo local';
   }
 }
