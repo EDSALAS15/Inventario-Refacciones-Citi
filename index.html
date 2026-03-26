@@ -465,7 +465,7 @@ async function clearStorage(){
 
 // ══ INIT ═════════════════════════════════════════════════════
 // ══ URL FUENTE DE DATOS ══════════════════════════════════════
-const _SRC='https://edsalas15.github.io/Inventario-Refacciones-Citi/InventarioAlmacenCarga.xlsx';
+const _SRC='https://raw.githubusercontent.com/EDSALAS15/Inventario-Refacciones-Citi/main/InventarioAlmacenCarga.xlsx';
 
 // ══ PARSEO COMPARTIDO ════════════════════════════════════════
 function _applyWorkbook(wb){
@@ -487,15 +487,41 @@ function _applyWorkbook(wb){
 async function init(){
   const stEl=document.getElementById('st-inv');
   stEl.textContent='⏳ Actualizando datos…';
-  try{
-    const resp=await fetch(_SRC);
-    if(!resp.ok) throw new Error('HTTP '+resp.status+' al descargar el archivo');
-    const buf=await resp.arrayBuffer();
-    _applyWorkbook(XLSX.read(buf,{type:'array'}));
-  } catch(err){
-    // Mostrar error exacto en pantalla
-    stEl.innerHTML='<span style="color:var(--red-tx)">⚠️ '+err.message+'</span>';
-    // Intentar datos locales como fallback
+
+  // Usar XMLHttpRequest: reporta errores CORS de forma más confiable que fetch
+  const ok = await new Promise(resolve=>{
+    const xhr=new XMLHttpRequest();
+    xhr.open('GET',_SRC,true);
+    xhr.responseType='arraybuffer';
+    xhr.timeout=30000;
+
+    xhr.onload=()=>{
+      if(xhr.status===200){
+        try{
+          _applyWorkbook(XLSX.read(xhr.response,{type:'array'}));
+          resolve(true);
+        } catch(e){
+          stEl.innerHTML='<span style="color:var(--red-tx)">⚠️ Error al leer el archivo: '+e.message+'</span>';
+          resolve(false);
+        }
+      } else {
+        stEl.innerHTML='<span style="color:var(--red-tx)">⚠️ HTTP '+xhr.status+' — archivo no encontrado</span>';
+        resolve(false);
+      }
+    };
+    xhr.onerror=()=>{
+      stEl.innerHTML='<span style="color:var(--red-tx)">⚠️ Error de red o CORS — verifica que el archivo esté en el repositorio</span>';
+      resolve(false);
+    };
+    xhr.ontimeout=()=>{
+      stEl.innerHTML='<span style="color:var(--red-tx)">⚠️ Tiempo de espera agotado (archivo muy grande o sin conexión)</span>';
+      resolve(false);
+    };
+    xhr.send();
+  });
+
+  // Si falló, intentar datos guardados localmente
+  if(!ok){
     invData=await load(K_INV);
     window._mpData=await load('inv_mp_v10')||[];
     const ts=await load(K_TS);
