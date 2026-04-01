@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventario de Refacciones Citi</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f5f4f0;--surf:#fff;--surf2:#f0ede6;--bord:rgba(0,0,0,.09);--bord2:rgba(0,0,0,.16);
+  --tx:#1a1a18;--tx2:#5f5e5a;--tx3:#999891;
+  --blue:#185fa5;--blue-bg:#e6f1fb;--blue-tx:#0c447c;
+  --green:#2d6a0f;--green-bg:#e8f5dd;--green-tx:#1e4d09;
+  --red:#a32d2d;--red-bg:#fce8e8;--red-tx:#7a1e1e;
+  --amber:#7a4800;--amber-bg:#fef0d0;--amber-tx:#5a3400;
+  --teal:#0a6650;--teal-bg:#dff4ed;--teal-tx:#064d3b;
+  --purple:#4a3fb0;--purple-bg:#eeedfd;--purple-tx:#332d85;
+  --gray-bg:#ebebeb;--gray-tx:#444;
+  --r:10px;--rlg:14px;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#1c1c1a;--surf:#272724;--surf2:#303030;--bord:rgba(255,255,255,.08);--bord2:rgba(255,255,255,.15);
+  --tx:#f0ede6;--tx2:#b0ada6;--tx3:#777570;
+  --blue:#4da3e8;--blue-bg:#0c3a6a;--blue-tx:#a8d4f5;
+  --green:#7ac44a;--green-bg:#1a3d08;--green-tx:#b0e080;
+  --red:#e87070;--red-bg:#5a1818;--red-tx:#f5b0b0;
+  --amber:#f0b030;--amber-bg:#4a2c00;--amber-tx:#f8d080;
+  --teal:#3ecfa0;--teal-bg:#043d2e;--teal-tx:#80e8c8;
+  --purple:#9090f0;--purple-bg:#28246a;--purple-tx:#c0c0f8;
+  --gray-bg:#3a3a38;--gray-tx:#c0bdb8;
+}}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--tx);font-size:14px;line-height:1.5;}
+.topbar{background:var(--surf);border-bottom:.5px solid var(--bord2);padding:13px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.topbar h1{font-size:16px;font-weight:600;letter-spacing:-.2px;}
+.topbar-right{display:flex;align-items:center;gap:14px;}
+#active-filter{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--blue-bg);color:var(--blue-tx);border:.5px solid var(--blue);display:none;cursor:pointer;white-space:nowrap;}
+#active-filter:hover{opacity:.8;}
+.ts{font-size:11px;color:var(--tx3);}
+
+.layout{display:grid;grid-template-columns:240px 1fr;min-height:calc(100vh - 48px);}
+.sidebar{background:var(--surf);border-right:.5px solid var(--bord);padding:16px 13px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;}
+.sidebar h2{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--tx3);}
+.fcard{background:var(--surf2);border:.5px solid var(--bord);border-radius:var(--r);padding:10px 12px;}
+.fcard .fn{font-size:12px;font-weight:600;margin-bottom:2px;}
+.fcard .fd{font-size:11px;color:var(--tx3);margin-bottom:7px;}
+.fstatus{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx2);margin-bottom:8px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--bord2);flex-shrink:0;}
+.dot.ok{background:#2d6a0f;}
+.ubtn{display:block;width:100%;padding:5px 0;font-size:12px;font-weight:500;color:var(--blue);background:var(--blue-bg);border:.5px solid var(--blue);border-radius:6px;cursor:pointer;text-align:center;transition:opacity .15s;}
+.ubtn:hover{opacity:.75;}
+input[type=file]{display:none;}
+.filters{display:flex;flex-direction:column;gap:4px;}
+.flabel{font-size:11px;color:var(--tx2);margin-bottom:2px;}
+select,input[type=text]{width:100%;padding:5px 8px;font-size:12px;border:.5px solid var(--bord2);border-radius:6px;background:var(--surf);color:var(--tx);outline:none;}
+select:focus,input[type=text]:focus{border-color:var(--blue);}
+
+.main{padding:18px;display:flex;flex-direction:column;gap:16px;overflow:auto;}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;}
+.kpi{background:var(--surf);border:.5px solid var(--bord);border-radius:var(--r);padding:12px 14px;transition:border-color .2s;}
+.kpi.sc{border-left:3px solid var(--amber);background:var(--amber-bg);}
+.kpi.hi{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue-bg);}
+.kpi-lbl{font-size:11px;color:var(--tx3);margin-bottom:4px;}
+.kpi.sc .kpi-lbl{color:var(--amber-tx);}
+.kpi-val{font-size:20px;font-weight:600;}
+.kpi.sc .kpi-val{color:var(--amber-tx);}
+.kpi-sub{font-size:11px;color:var(--tx2);margin-top:2px;}
+.kpi.sc .kpi-sub{color:var(--amber-tx);opacity:.7;}
+
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.card{background:var(--surf);border:.5px solid var(--bord);border-radius:var(--rlg);padding:15px 17px;transition:border-color .2s;}
+.card-ttl{font-size:13px;font-weight:600;margin-bottom:2px;}
+.card-hint{font-size:10px;color:var(--tx3);margin-bottom:12px;}
+.card.has-sel{border-color:var(--blue);}
+
+/* SVG bar interactivo */
+.bar-group{cursor:pointer;transition:opacity .15s;}
+.bar-group:hover .bar-rect{filter:brightness(1.12);}
+.bar-group.dimmed{opacity:.28;}
+.bar-group.selected .bar-rect{stroke-width:1.5;}
+.bar-group.selected .bar-label{font-weight:700;}
+
+.tcard{background:var(--surf);border:.5px solid var(--bord);border-radius:var(--rlg);overflow:hidden;transition:border-color .2s;}
+.tcard.has-sel{border-color:var(--blue);}
+.thead-row{padding:12px 17px;border-bottom:.5px solid var(--bord);display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.tabs{display:flex;gap:2px;border-bottom:.5px solid var(--bord);}
+.tab{padding:7px 14px;font-size:12px;font-weight:500;color:var(--tx2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;}
+.tab:hover{color:var(--tx);}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);}
+.tc{display:none;}.tc.active{display:block;}
+.tscroll{max-height:380px;overflow:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead th{padding:7px 13px;text-align:left;font-size:11px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.3px;border-bottom:.5px solid var(--bord);background:var(--surf2);white-space:nowrap;position:sticky;top:0;z-index:1;}
+tbody tr{border-bottom:.5px solid var(--bord);transition:background .1s;}
+tbody tr:hover{background:var(--surf2);}
+tbody tr.dimmed-row{opacity:.35;}
+tbody td{padding:7px 13px;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;}
+.badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500;}
+.b-blue{background:var(--blue-bg);color:var(--blue-tx);}
+.b-green{background:var(--green-bg);color:var(--green-tx);}
+.b-red{background:var(--red-bg);color:var(--red-tx);}
+.b-amber{background:var(--amber-bg);color:var(--amber-tx);}
+.b-teal{background:var(--teal-bg);color:var(--teal-tx);}
+.b-purple{background:var(--purple-bg);color:var(--purple-tx);}
+.b-gray{background:var(--gray-bg);color:var(--gray-tx);}
+.prog{display:flex;align-items:center;gap:7px;}
+.prog-bar{flex:1;height:5px;background:var(--surf2);border-radius:3px;overflow:hidden;min-width:50px;}
+.prog-fill{height:100%;border-radius:3px;}
+.prog-val{font-size:11px;color:var(--tx2);min-width:28px;text-align:right;}
+.empty{text-align:center;padding:60px 20px;color:var(--tx3);}
+.empty .ico{font-size:38px;margin-bottom:10px;}
+.refac-btn{padding:6px 4px;font-size:11px;font-weight:600;text-align:center;border-radius:6px;cursor:pointer;border:.5px solid var(--bord2);background:var(--surf2);color:var(--tx2);transition:all .15s;user-select:none;}
+.refac-btn:hover{border-color:var(--blue);color:var(--blue);}
+.refac-btn.active{background:var(--blue-bg);color:var(--blue-tx);border-color:var(--blue);font-weight:700;}
+
+/* Filas seleccionables en tabla */
+tbody tr.row-selected{background:var(--blue-bg)!important;outline:.5px solid var(--blue);}
+tbody tr.row-dimmed{opacity:.3;}
+tbody tr.row-selected td{color:var(--blue-tx);}
+
+/* Filtros colapsables con checkboxes */
+/* Cabecera del filtro (toggle) */
+.f-hdr{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:4px 2px;user-select:none;border-radius:4px;}
+.f-hdr:hover{background:var(--surf2);}
+.f-hdr-lbl{font-size:11px;font-weight:600;color:var(--tx2);}
+.f-hdr-right{display:flex;align-items:center;gap:5px;}
+.f-hdr-badge{font-size:10px;font-weight:700;color:var(--blue-tx);background:var(--blue-bg);padding:1px 6px;border-radius:10px;display:none;}
+.f-hdr-arr{font-size:9px;color:var(--tx3);transition:transform .2s;}
+.f-hdr-arr.open{transform:rotate(180deg);}
+/* Cuerpo colapsable */
+.f-body{display:none;margin-top:4px;}
+.f-body.open{display:block;}
+/* Caja de opciones */
+.ms-box{background:var(--surf2);border:.5px solid var(--bord);border-radius:6px;overflow:hidden;}
+/* buscadores eliminados */
+.ms-options{max-height:140px;overflow-y:auto;}
+.ms-opt{display:flex;align-items:center;gap:7px;padding:4px 8px;font-size:11px;cursor:pointer;transition:background .1s;}
+.ms-opt:hover{background:var(--surf);}
+.ms-opt.ms-opt-all{border-bottom:.5px solid var(--bord);font-weight:600;}
+.ms-opt input[type=checkbox]{width:12px;height:12px;accent-color:var(--blue);cursor:pointer;flex-shrink:0;margin:0;}
+.ms-opt label{cursor:pointer;color:var(--tx);flex:1;line-height:1.3;}
+.ms-opt.ms-opt-all label{color:var(--blue-tx);}
+.ms-badge{display:inline-block;background:var(--blue-bg);color:var(--blue-tx);font-size:10px;font-weight:600;padding:1px 5px;border-radius:10px;margin-left:4px;}
+/* Botón limpiar filtros */
+.btn-clear-filters{width:100%;padding:5px 0;font-size:11px;font-weight:600;color:var(--red-tx);background:var(--red-bg);border:.5px solid var(--red);border-radius:6px;cursor:pointer;text-align:center;transition:opacity .15s;margin-bottom:4px;}
+.btn-clear-filters:hover{opacity:.8;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Inventario de Refacciones Citi</h1>
+  <div class="topbar-right">
+    <div id="active-filter" onclick="clearBISelection()">✕ Limpiar selección</div>
+    <span class="ts" id="ts">Sin datos cargados</span>
+  </div>
+</div>
+
+<div class="layout">
+<aside class="sidebar">
+  <div><h2>Archivos de Datos</h2></div>
+
+  <div class="fcard">
+    <div class="fn">InventarioAlmacen.xlsx</div>
+    <div class="fd">Existencias por almacén</div>
+    <div class="fstatus"><div class="dot" id="dot-inv"></div><span id="st-inv">Sin cargar</span></div>
+    <label class="ubtn" for="f-inv"><span id="btn-inv">Cargar archivo</span></label>
+    <input type="file" id="f-inv" accept=".xls,.xlsx,.csv">
+    <button onclick="resetStorage()" id="btn-reset"
+      style="display:none;width:100%;margin-top:6px;padding:5px 0;font-size:11px;color:var(--red-tx);background:var(--red-bg);border:.5px solid var(--red);border-radius:6px;cursor:pointer;">
+      Limpiar memoria
+    </button>
+  </div>
+  <div>
+    <h2>Filtros globales</h2>
+    <div class="filters">
+      <button class="btn-clear-filters" onclick="clearAllFilters()">↺ Limpiar Filtros</button>
+      <div>
+        <div class="flabel">Tipo de Refacción</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:2px;">
+          <div id="btn-prev" class="refac-btn active" onclick="setRefac('prev')">🔧 Preventivos</div>
+          <div id="btn-corr" class="refac-btn" onclick="setRefac('corr')">🔩 Correctivos</div>
+        </div>
+      </div>
+      <!-- Almacén -->
+      <div>
+        <div class="f-hdr" onclick="fToggle('alm')">
+          <span class="f-hdr-lbl">Almacén</span>
+          <div class="f-hdr-right">
+            <span class="f-hdr-badge" id="f-badge-alm"></span>
+            <span class="f-hdr-arr" id="f-arr-alm">▼</span>
+          </div>
+        </div>
+        <div class="f-body" id="f-body-alm">
+          <div class="ms-box"><div class="ms-options" id="ms-alm-options"></div></div>
+        </div>
+      </div>
+      <!-- Tipo de Mantenimiento (checkbox MS) -->
+      <div id="wrap-tipo">
+        <div class="f-hdr" onclick="fToggle('tipo')">
+          <span class="f-hdr-lbl">Tipo de Mantenimiento</span>
+          <div class="f-hdr-right">
+            <span class="f-hdr-badge" id="f-badge-tipo"></span>
+            <span class="f-hdr-arr" id="f-arr-tipo">▼</span>
+          </div>
+        </div>
+        <div class="f-body" id="f-body-tipo">
+          <div class="ms-box"><div class="ms-options" id="ms-tipo-options"></div></div>
+        </div>
+      </div>
+      <!-- Familia (modo correctivos, checkbox MS) -->
+      <div id="wrap-familia" style="display:none">
+        <div class="f-hdr" onclick="fToggle('fam')">
+          <span class="f-hdr-lbl"><span id="lbl-familia">Familia</span></span>
+          <div class="f-hdr-right">
+            <span class="f-hdr-badge" id="f-badge-fam"></span>
+            <span class="f-hdr-arr" id="f-arr-fam">▼</span>
+          </div>
+        </div>
+        <div class="f-body" id="f-body-fam">
+          <div class="ms-box"><div class="ms-options" id="ms-fam-options"></div></div>
+        </div>
+      </div>
+      <!-- Existencia (checkbox MS) -->
+      <div>
+        <div class="f-hdr" onclick="fToggle('exist')">
+          <span class="f-hdr-lbl">Existencia</span>
+          <div class="f-hdr-right">
+            <span class="f-hdr-badge" id="f-badge-exist"></span>
+            <span class="f-hdr-arr" id="f-arr-exist">▼</span>
+          </div>
+        </div>
+        <div class="f-body" id="f-body-exist">
+          <div class="ms-box"><div class="ms-options" id="ms-exist-options"></div></div>
+        </div>
+      </div>
+      <!-- Clasificación -->
+      <div>
+        <div class="f-hdr" onclick="fToggle('clas')">
+          <span class="f-hdr-lbl">Clasificación</span>
+          <div class="f-hdr-right">
+            <span class="f-hdr-badge" id="f-badge-clas"></span>
+            <span class="f-hdr-arr" id="f-arr-clas">▼</span>
+          </div>
+        </div>
+        <div class="f-body" id="f-body-clas">
+          <div class="ms-box"><div class="ms-options" id="ms-clas-options"></div></div>
+        </div>
+      </div>
+      <!-- Tipo de Necesidad -->
+      <div>
+        <div class="f-hdr" onclick="fToggle('tnec')">
+          <span class="f-hdr-lbl">Tipo de Necesidad</span>
+          <div class="f-hdr-right">
+            <span class="f-hdr-badge" id="f-badge-tnec"></span>
+            <span class="f-hdr-arr" id="f-arr-tnec">▼</span>
+          </div>
+        </div>
+        <div class="f-body" id="f-body-tnec">
+          <div class="ms-box"><div class="ms-options" id="ms-tnec-options"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="empty" id="empty">
+    <div class="ico">📦</div>
+    <p>Carga los dos archivos para visualizar el inventario</p>
+    <small style="font-size:11px;color:var(--tx3)">Codigos_MP + InventarioAlmacen</small>
+  </div>
+
+  <div id="dash" style="display:none;flex-direction:column;gap:16px;">
+
+    <div class="kpis">
+      <div class="kpi" id="kpi-mat"><div class="kpi-lbl" id="k-mat-lbl">Materiales preventivos</div><div class="kpi-val" id="k-mat">—</div><div class="kpi-sub" id="k-tipos-sub"></div></div>
+      <div class="kpi"><div class="kpi-lbl">Existencias totales</div><div class="kpi-val" id="k-exist" style="color:var(--blue)">—</div><div class="kpi-sub" id="k-exist-sub">Piezas</div></div>
+      <div class="kpi"><div class="kpi-lbl">Con existencia</div><div class="kpi-val" id="k-con" style="color:var(--green)">—</div><div class="kpi-sub" id="k-con-p"></div></div>
+      <div class="kpi"><div class="kpi-lbl">Sin existencia</div><div class="kpi-val" id="k-sin" style="color:var(--red)">—</div><div class="kpi-sub" id="k-sin-p"></div></div>
+      <div class="kpi sc"><div class="kpi-lbl" id="k-sc-lbl">Correctivos</div><div class="kpi-val" id="k-sc">—</div><div class="kpi-sub" id="k-sc-exist"></div></div>
+      <div class="kpi"><div class="kpi-lbl">Días de Inventario</div><div class="kpi-val" id="k-dias" style="color:var(--teal)">—</div><div class="kpi-sub" id="k-dias-sub">Promedio ponderado</div></div>
+    </div>
+
+    <!-- Layout: izquierda = Tipos | derecha = Existencias (arriba) + Días (abajo) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+      <!-- Col izquierda: Tipos de Mantenimiento -->
+      <div class="card" id="card-tipos">
+        <div class="card-ttl" id="ttl-chart-tipos">Existencias por Tipo de Mantenimiento</div>
+        <div class="card-hint">Haz clic en una barra para filtrar</div>
+        <div id="chart-tipos"></div>
+      </div>
+      <!-- Col derecha: Existencias por Almacén + Días de Inventario -->
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card" id="card-alm">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+            <div class="card-ttl" style="margin:0">Existencias por Almacén</div>
+            <button onclick="exportAlmacenExcel()" id="btn-export-alm"
+              style="font-size:11px;font-weight:500;padding:4px 10px;border:.5px solid var(--green);border-radius:6px;background:var(--green-bg);color:var(--green-tx);cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0">
+                <path d="M6 1v7M3 5.5l3 3 3-3M1 9.5v1a.5.5 0 00.5.5h9a.5.5 0 00.5-.5v-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Exportar Excel
+            </button>
+          </div>
+          <div class="card-hint">Haz clic en una barra para filtrar</div>
+          <div id="chart-alm"></div>
+        </div>
+        <div class="card" id="card-dias-alm">
+          <div class="card-ttl">Días de Inventario por Almacén</div>
+          <div class="card-hint">Existencias ÷ Consumo Diario</div>
+          <div id="chart-dias-alm"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tcard" id="tcard">
+      <div class="thead-row">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="card-ttl" style="margin:0">Detalle de Inventario</div>
+          <span id="table-count" style="font-size:11px;color:var(--tx3)"></span>
+        </div>
+        <input type="text" id="search" placeholder="Buscar código, descripción..." style="width:200px;font-size:12px;">
+      </div>
+      <div class="tabs" style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;">
+          <div class="tab active" data-t="det" onclick="setActiveTab('det')">Por Material</div>
+          <div class="tab" data-t="res" onclick="setActiveTab('res')">Por Tipo Mant.</div>
+          <div class="tab" data-t="alm" onclick="setActiveTab('alm')">Por Almacén</div>
+        </div>
+        <div style="padding:0 14px;">
+          <button id="btn-exp-det" onclick="exportTabla('det')"
+            style="font-size:11px;font-weight:500;padding:4px 10px;border:.5px solid var(--green);border-radius:6px;background:var(--green-bg);color:var(--green-tx);cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 5.5l3 3 3-3M1 9.5v1a.5.5 0 00.5.5h9a.5.5 0 00.5-.5v-1" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Exportar Excel
+          </button>
+        </div>
+      </div>
+      <div class="tc active tscroll" id="tc-det">
+        <table><thead><tr><th>Código</th><th>Descripción</th><th>Tipo Mantenimiento</th><th>Almacén</th><th>Clasificación</th><th>Tipo Necesidad</th><th style="text-align:right">Existencia</th><th style="text-align:right">Cons. Diario</th><th style="text-align:right">Días Inv.</th></tr></thead>
+        <tbody id="tb-det"></tbody></table>
+      </div>
+      <div class="tc tscroll" id="tc-res">
+        <table><thead><tr><th id="th-tipo">Tipo de Mantenimiento</th><th style="text-align:right">Materiales</th><th style="text-align:right">Con Exist.</th><th style="text-align:right">Sin Exist.</th><th>Cobertura</th><th style="text-align:right">Total Exist.</th><th style="text-align:right">Cons. Diario</th><th style="text-align:right">Días Inv.</th></tr></thead>
+        <tbody id="tb-res"></tbody></table>
+      </div>
+      <div class="tc tscroll" id="tc-alm">
+        <table><thead><tr><th>Almacén</th><th>Tipo Mantenimiento</th><th style="text-align:right">Materiales</th><th style="text-align:right">Total Exist.</th><th style="text-align:right">Cons. Diario</th><th style="text-align:right">Días Inv.</th></tr></thead>
+        <tbody id="tb-alm"></tbody></table>
+      </div>
+    </div>
+
+  </div>
+</main>
+</div>
+
+<script>
+// ══ CONSTANTES ══════════════════════════════════════════════
+const K_INV='inv_v10', K_TS='inv_ts_v10';
+const PAL=['#185fa5','#0f6e56','#534ab7','#7a4800','#a32d2d','#2d6a0f','#993556','#555','#1d9e75','#0a6650','#4a3fb0','#ba7517'];
+const TC_LIST=['b-blue','b-teal','b-purple','b-amber','b-red','b-green'];
+const TC_MAP={}; let tci=0;
+function badgeClass(t){if(t==='Sin clasificar'||t==='Correctivo')return 'b-gray';if(!TC_MAP[t])TC_MAP[t]=TC_LIST[tci++%TC_LIST.length];return TC_MAP[t];}
+
+// ══ CACHÉ DE ELEMENTOS DOM ════════════════════════════════════
+const $ = id => document.getElementById(id);
+const DOM = {};
+function cacheDOM(){
+  ['ts','dot-inv','st-inv','btn-inv','btn-reset','empty','dash',
+   'search','table-count','tb-det','tb-res','tb-alm','chart-tipos','chart-alm',
+   'k-mat','k-mat-lbl','k-tipos-sub','k-exist','k-exist-sub','k-con','k-con-p',
+   'k-sin','k-sin-p','k-sc','k-sc-lbl','k-sc-exist','kpi-mat',
+   'active-filter','card-tipos','card-alm','tcard','th-tipo',
+   'ttl-chart-tipos','lbl-familia','wrap-tipo','wrap-familia',
+   'btn-prev','btn-corr',
+   'ms-alm-options','ms-fam-options','ms-clas-options','ms-tnec-options',
+   'ms-tipo-options','ms-exist-options',
+   'f-badge-alm','f-badge-fam','f-badge-clas','f-badge-tnec','f-badge-tipo','f-badge-exist',
+   'f-body-alm','f-body-fam','f-body-clas','f-body-tnec','f-body-tipo','f-body-exist',
+   'f-arr-alm','f-arr-fam','f-arr-clas','f-arr-tnec','f-arr-tipo','f-arr-exist'
+  ].forEach(id=>{DOM[id]=$(id);});
+}
+
+// ══ ESTADO GLOBAL ═══════════════════════════════════════════
+let invData=null;
+let allClas=[],allSC=[];
+let baseClas=[],baseSC=[];
+let selTipos=new Set(), selAlms=new Set(), selRows=new Set();
+let modoRefac='prev', familiaCol='';
+
+
+// ══ MOTOR MULTI-SELECT INLINE ════════════════════════════════
+// sel.size===0  → "Todos" (no filtra nada)
+// sel===Set{'__none__'} → ninguno
+// sel con valores reales → solo esos valores
+const MS={
+  alm: {sel:new Set(), opts:[], optsId:'ms-alm-options',  badgeId:'f-badge-alm'},
+  fam: {sel:new Set(), opts:[], optsId:'ms-fam-options',  badgeId:'f-badge-fam'},
+  clas:{sel:new Set(), opts:[], optsId:'ms-clas-options', badgeId:'f-badge-clas'},
+  tnec:{sel:new Set(), opts:[], optsId:'ms-tnec-options', badgeId:'f-badge-tnec'},
+  tipo:{sel:new Set(), opts:[], optsId:'ms-tipo-options', badgeId:'f-badge-tipo'},
+  exist:{sel:new Set(), opts:['Con existencia','Sin existencia'], optsId:'ms-exist-options', badgeId:'f-badge-exist'}
+};
+
+function msIsAll(k){ return MS[k].sel.size===0; }
+
+function msSetSingle(k, value){
+  // Seleccionar una sola opción (usado desde BI)
+  MS[k].sel.clear();
+  MS[k].sel.add(value);
+  msRender(k); msBadge(k);
+}
+
+function msSetMultiple(k, values){
+  // Seleccionar un conjunto de valores (desde BI multi-select)
+  MS[k].sel.clear();
+  values.forEach(v=>MS[k].sel.add(v));
+  if(MS[k].sel.size===MS[k].opts.length) MS[k].sel.clear(); // si son todos, colapsar a "todos"
+  msRender(k); msBadge(k);
+}
+
+function msPopulate(k, opts){
+  MS[k].opts=opts; MS[k].sel.clear(); msRender(k); msBadge(k);
+}
+
+function msRender(k){
+  const s=MS[k];
+  const el=$(s.optsId); if(!el) return;
+  const isAll=msIsAll(k);
+  const frag=document.createDocumentFragment();
+  // Fila "Todos"
+  const allDiv=document.createElement('div');
+  allDiv.className='ms-opt ms-opt-all';
+  allDiv.innerHTML=`<input type="checkbox" id="mso-${k}-__all__"${isAll?' checked':''} onchange="msChgAll('${k}',this)"><label for="mso-${k}-__all__">Todos</label>`;
+  frag.appendChild(allDiv);
+  // Opciones individuales
+  for(const o of s.opts){
+    const chk=isAll||s.sel.has(o);
+    const id='mso-'+k+'-'+o.replace(/\W/g,'_');
+    const div=document.createElement('div'); div.className='ms-opt';
+    div.innerHTML=`<input type="checkbox" id="${id}" value="${o}"${chk?' checked':''} onchange="msChg('${k}',this)"><label for="${id}">${o}</label>`;
+    frag.appendChild(div);
+  }
+  el.innerHTML=''; el.appendChild(frag);
+}
+
+function msBadge(k){
+  // Actualizar badge de la cabecera del filtro
+  const s=MS[k], el=$(s.badgeId); if(!el) return;
+  if(s.sel.size===0 || s.sel.has('__none__')){ el.style.display='none'; el.textContent=''; }
+  else{ el.textContent=s.sel.size; el.style.display='inline-block'; }
+}
+
+function msChgAll(k, el){
+  if(el.checked){ MS[k].sel.clear(); }          // Todos marcado → limpiar (= todos)
+  else { MS[k].sel=new Set(['__none__']); }       // Todos desmarcado → ninguno
+  msRender(k); msBadge(k); msFilter();
+}
+
+function msChg(k, el){
+  const s=MS[k];
+  if(el.checked){
+    // Marcar una opción individual
+    if(s.sel.has('__none__')) s.sel.delete('__none__');
+    if(s.sel.size===0){
+      // Veníamos de "Todos": ahora queremos SOLO esta opción
+      s.sel.add(el.value);
+      // No expandimos; la lógica es: marcar uno desde "Todos" = seleccionar solo ese
+    } else {
+      s.sel.add(el.value);
+      // Si ahora están todos → colapsar a "Todos"
+      if(s.sel.size===s.opts.length) s.sel.clear();
+    }
+  } else {
+    // Desmarcar una opción individual
+    if(s.sel.size===0){
+      // Desde "Todos": expandir a todos menos este
+      s.opts.forEach(o=>{ if(o!==el.value) s.sel.add(o); });
+    } else {
+      s.sel.delete(el.value);
+      if(s.sel.size===0) s.sel.add('__none__'); // último desmarcado → ninguno
+    }
+  }
+  msRender(k); msBadge(k); msFilter();
+}
+
+// ── Acordeón de filtros ──────────────────────────────────────
+function fToggle(key){
+  const body=$('f-body-'+key), arr=$('f-arr-'+key);
+  if(!body) return;
+  const open=body.classList.contains('open');
+  body.classList.toggle('open',!open);
+  if(arr) arr.classList.toggle('open',!open);
+}
+
+function msFilter(){
+  selTipos.clear(); selAlms.clear(); selRows.clear();
+  if(allClas.length||allSC.length) scheduleFilter();
+}
+
+// Aplazamiento de filtrado: agrupa clics rápidos en un solo render
+let _filterTimer=null;
+function scheduleFilter(){
+  clearTimeout(_filterTimer);
+  _filterTimer=setTimeout(applyFilters, 80);
+}
+
+function clearAllFilters(){
+  ['alm','fam','clas','tnec','tipo','exist'].forEach(k=>{
+    MS[k].sel.clear(); msRender(k); msBadge(k);
+  });
+  selTipos.clear(); selAlms.clear(); selRows.clear();
+  applyFilters();
+}
+
+// ══ STORAGE ══════════════════════════════════════════════════
+async function save(k,v){
+  const json=JSON.stringify(v);
+  try{localStorage.setItem('inv_dash_'+k,json);}catch(e){}
+  try{if(window.storage)await window.storage.set(k,json);}catch(e){}
+}
+async function load(k){
+  try{const v=localStorage.getItem('inv_dash_'+k);if(v)return JSON.parse(v);}catch(e){}
+  try{if(window.storage){const r=await window.storage.get(k);if(r)return JSON.parse(r.value);}}catch(e){}
+  return null;
+}
+async function clearStorage(){
+  ['inv_v10','inv_mp_v10','inv_ts_v10'].forEach(k=>{try{localStorage.removeItem('inv_dash_'+k);}catch(e){}});
+  try{if(window.storage){
+    await window.storage.delete('inv_v10');
+    await window.storage.delete('inv_mp_v10');
+    await window.storage.delete('inv_ts_v10');
+  }}catch(e){}
+}
+
+// ══ PARSER COMPARTIDO DE WORKBOOK ════════════════════════════
+function parseWorkbook(wb){
+  const sName=wb.SheetNames.includes('InventarioAlmacen')?'InventarioAlmacen':wb.SheetNames[0];
+  const invRows=XLSX.utils.sheet_to_json(wb.Sheets[sName],{defval:''});
+  const mpSheet=wb.SheetNames.find(s=>/c[oó]digos|mp|mtto|cat[aá]logo/i.test(s)&&s!==sName)||wb.SheetNames.find(s=>s!==sName);
+  const mpRows=mpSheet?XLSX.utils.sheet_to_json(wb.Sheets[mpSheet],{defval:''}):[]; 
+  return {invRows,mpRows};
+}
+
+function applyParsed(invRows,mpRows){
+  invData=invRows;
+  window._mpData=mpRows;
+  save(K_INV,invData); save('inv_mp_v10',mpRows);
+  const now=new Date().toLocaleString('es-MX');
+  save(K_TS,now);
+  DOM['ts'].textContent='Actualizado: '+now;
+  updateStatus();
+  selTipos.clear();selAlms.clear();selRows.clear();
+  buildAndRender();
+}
+
+// ══ AUTO-ACTUALIZACIÓN ══════════════════════════════════════
+async function autoUpdate(){
+  const RAW_URL='https://raw.githubusercontent.com/EDSALAS15/Inventario-Refacciones-Citi/main/InventarioAlmacen.xlsx';
+  const tsEl=DOM['ts'];
+  const prevTs=tsEl.textContent;
+  tsEl.textContent='ACTUALIZANDO';
+  try{
+    const resp=await fetch(RAW_URL,{cache:'no-store'});
+    if(!resp.ok)throw new Error('Sin respuesta');
+    const buf=await resp.arrayBuffer();
+    const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+    const {invRows,mpRows}=parseWorkbook(wb);
+    applyParsed(invRows,mpRows);
+  }catch(e){
+    tsEl.textContent=prevTs||'Sin datos cargados';
+    if(invData&&invData.length)buildAndRender();
+  }
+}
+
+// ══ INIT ═════════════════════════════════════════════════════
+async function init(){
+  cacheDOM();
+  invData=await load(K_INV);
+  window._mpData=await load('inv_mp_v10')||[];
+  const ts=await load(K_TS);
+  if(ts)DOM['ts'].textContent='Actualizado: '+ts;
+  updateStatus();
+  await autoUpdate();
+}
+
+// ══ CARGA MANUAL DE ARCHIVO ══════════════════════════════════
+$('f-inv').addEventListener('change',e=>readFile(e.target.files[0]));
+
+function readFile(file){
+  if(!file)return;
+  const r=new FileReader();
+  r.onload=evt=>{
+    try{
+      const wb=XLSX.read(evt.target.result,{type:'binary'});
+      const {invRows,mpRows}=parseWorkbook(wb);
+      applyParsed(invRows,mpRows);
+    }catch(e){alert('Error: '+e.message);}
+  };
+  r.readAsBinaryString(file);
+}
+
+function updateStatus(){
+  const d=invData, mp=window._mpData||[];
+  const hasData=!!(d&&d.length>0);
+  DOM['dot-inv'].className='dot'+(hasData?' ok':'');
+  if(hasData){
+    const ts=localStorage.getItem('inv_dash_'+K_TS)||'';
+    DOM['st-inv'].innerHTML=d.length.toLocaleString()+' registros'+(mp.length?' · '+mp.length+' cód.':'')+
+      (ts?'<br><span style="font-size:10px;color:var(--tx3)">En memoria desde: '+JSON.parse(ts)+'</span>':'');
+  } else {
+    DOM['st-inv'].textContent='Sin datos en memoria';
+  }
+  DOM['btn-inv'].textContent=hasData?'Actualizar archivo':'Cargar archivo';
+  if(DOM['btn-reset'])DOM['btn-reset'].style.display=hasData?'block':'none';
+}
+
+async function resetStorage(){
+  if(!confirm('¿Limpiar los datos en memoria? Deberás volver a cargar el archivo.')) return;
+  invData=null; window._mpData=[];
+  await clearStorage();
+  DOM['empty'].style.display='block';
+  DOM['dash'].style.display='none';
+  updateStatus();
+}
+
+// ══ CONSTRUCCIÓN DE FILAS ════════════════════════════════════
+function buildRows(){
+  const mpRaw=window._mpData||[];
+  const invCols=invData.length?Object.keys(invData[0]):[];
+  const tiposSet=new Set();
+  if(mpRaw.length){
+    const mpCols=Object.keys(mpRaw[0]);
+    const mpCompCol=mpCols.find(c=>c.trim()==='COMPONENTE')||mpCols.find(c=>/^componente$/i.test(c.trim()))||mpCols[2];
+    for(const r of mpRaw){const v=String(r[mpCompCol]||'').trim().toUpperCase();if(v)tiposSet.add(v);}
+  }
+  const fc=(ex,re,i)=>invCols.find(c=>c.trim()===ex)||invCols.find(c=>re.test(c.trim()))||invCols[i];
+  const codCol  =fc('Código',     /^c[oó]digo$/i,    2);
+  const mttoCol =fc('MTTO',       /^mtto$/i,          3);
+  const descCol =fc('Descripción',/^descripci/i,      4);
+  const existCol=fc('Existencias',/^exist/i,         12);
+  const almCol  =fc('Almacén',    /^alm[aá]c[eé]n$/i,0);
+  const divCol  =fc('Division',   /^divis/i,          1);
+  familiaCol=invCols.find(c=>['Familia','familia','FAMILIA'].includes(c.trim()))||invCols.find(c=>/^famil/i.test(c.trim()))||invCols.find(c=>/^clasif/i.test(c.trim()))||invCols[9]||'';
+  const clasifCol=invCols.find(c=>/^clasificaci[oó]n$/i.test(c.trim()))||invCols.find(c=>/clasif/i.test(c.trim()))||null;
+  const tnecCol    =invCols.find(c=>c.trim()==='Tipo de Necesidad')||invCols.find(c=>/necesidad/i.test(c.trim()))||null;
+  const consMensCol=invCols.find(c=>c.trim()==='Consumo mensual')||invCols.find(c=>/consumo.{0,3}mensual/i.test(c.trim()))||null;
+  const consDiarCol=invCols.find(c=>c.trim()==='Consumo Diario' )||invCols.find(c=>/consumo.{0,3}diario/i.test(c.trim()) )||null;
+  const diasInvCol =invCols.find(c=>c.trim()==='Días de Inventario')||invCols.find(c=>/d.as.{0,5}inventario/i.test(c.trim()))||null;
+  if(DOM['lbl-familia'])DOM['lbl-familia'].textContent=familiaCol||'Agrupación';
+  console.log('[Cols detectadas]',{consMensCol,consDiarCol,diasInvCol,tnecCol,clasifCol});
+  console.log('[Cols disponibles]', invCols);
+  const clas=[],sc=[];
+  const hasFam=!!familiaCol, hasClas=!!clasifCol, hasTnec=!!tnecCol, hasDiar=!!consDiarCol, hasDias=!!diasInvCol;
+  for(const r of invData){
+    const codigo=String(r[codCol]||'').trim(); if(!codigo)continue;
+    const alm=String(r[almCol]||'').trim(), div=String(r[divCol]||'').trim();
+    const almacen=(alm&&div)?alm+' – '+div:(alm||div||'Sin almacén');
+    const exist=parseFloat(String(r[existCol]||'0').replace(',','.'))||0;
+    const mttoRaw=String(r[mttoCol]||'').trim().toUpperCase();
+    const familia=hasFam?String(r[familiaCol]||'').trim()||'Sin familia':'Sin familia';
+    const row={
+      codigo, desc:String(r[descCol]||'').trim(),
+      almacen, existencia:exist, familia,
+      clasif:hasClas?String(r[clasifCol]||'').trim():'',
+      tnec:hasTnec?String(r[tnecCol]||'').trim():'',
+      consDiar:consDiarCol?parseFloat(String(r[consDiarCol]||'0').replace(',','.'))||0:0,
+      diasInv: diasInvCol ?parseFloat(String(r[diasInvCol] ||'0').replace(',','.'))||0:0
+    };
+    if(tiposSet.has(mttoRaw)){row.tipo=mttoRaw.charAt(0)+mttoRaw.slice(1).toLowerCase();clas.push(row);}
+    else{row.tipo=familia||'Sin familia';sc.push(row);}
+  }
+  return{clas,sc};
+}
+
+// ══ BUILD & RENDER ═══════════════════════════════════════════
+function buildAndRender(){
+  const{clas,sc}=buildRows();
+  allClas=clas; allSC=sc;
+  populateFilters();
+  const allRows=[...allClas,...allSC];
+  msPopulate('clas',[...new Set(allRows.map(r=>r.clasif).filter(Boolean))].sort());
+  msPopulate('tnec',[...new Set(allRows.map(r=>r.tnec).filter(Boolean))].sort());
+  DOM['empty'].style.display='none';
+  DOM['dash'].style.display='flex';
+  updateKPIsc();
+  applyFilters();
+}
+
+// ══ FILTROS SIDEBAR ══════════════════════════════════════════
+function populateFilters(){
+  const src=modoRefac==='corr'?allSC:allClas;
+  msPopulate('alm',[...new Set(src.map(r=>r.almacen))].sort());
+  if(modoRefac==='prev'){
+    DOM['wrap-tipo'].style.display='';
+    DOM['wrap-familia'].style.display='none';
+    msPopulate('tipo',[...new Set(allClas.map(r=>r.tipo))].sort());
+  } else {
+    DOM['wrap-tipo'].style.display='none';
+    DOM['wrap-familia'].style.display='';
+    msPopulate('fam',[...new Set(allSC.map(r=>r.tipo))].filter(Boolean).sort());
+  }
+  // Existencia: opciones fijas, solo re-renderizar para reset
+  MS.exist.sel.clear(); msRender('exist'); msBadge('exist');
+}
+
+function setRefac(modo){
+  if(modoRefac===modo)return;
+  modoRefac=modo;
+  selTipos.clear();selAlms.clear();selRows.clear();
+  DOM['btn-prev'].classList.toggle('active',modo==='prev');
+  DOM['btn-corr'].classList.toggle('active',modo==='corr');
+  const isPrev=modo==='prev';
+  DOM['k-mat-lbl'].textContent=isPrev?'Materiales preventivos':'Materiales correctivos';
+  DOM['k-exist-sub'].textContent=isPrev?'Piezas preventivas':'Piezas correctivas';
+  DOM['k-sc-lbl'].textContent=isPrev?'Correctivos':'Preventivos';
+  DOM['ttl-chart-tipos'].textContent=isPrev?'Existencias por Tipo de Mantenimiento':'Existencias por '+(familiaCol||'Clasificación');
+  if(DOM['th-tipo'])DOM['th-tipo'].textContent=isPrev?'Tipo de Mantenimiento':(familiaCol||'Familia');
+  MS.exist.sel.clear(); msRender('exist'); msBadge('exist');
+  populateFilters();
+  applyFilters();
+}
+
+function applyFilters(){
+  const sAlm=MS.alm.sel, sClas=MS.clas.sel, sFam=MS.fam.sel;
+  const sTnec=MS.tnec.sel, sTipo=MS.tipo.sel, sExist=MS.exist.sel;
+  const srch=DOM['search'].value.toLowerCase();
+
+  // NOTA: el filtro de almacén NO se aplica en baseClas/baseSC.
+  // Se aplica solo como highlight visual en renderAll (igual que el BI de barras).
+  // Esto garantiza que la gráfica mantenga siempre el mismo tamaño y número de columnas.
+  const filt=(rows,extraFn)=>{
+    let r=rows;
+    // Existencia
+    if(sExist.size>0 && !sExist.has('__none__')){
+      const conEx=sExist.has('Con existencia'), sinEx=sExist.has('Sin existencia');
+      if(conEx && !sinEx) r=r.filter(x=>x.existencia>0);
+      else if(sinEx && !conEx) r=r.filter(x=>x.existencia<=0);
+    }
+    // Clasificación
+    if(sClas.size>0){if(sClas.has('__none__'))r=[];else r=r.filter(x=>sClas.has(x.clasif));}
+    // Tipo de Necesidad
+    if(sTnec.size>0){if(sTnec.has('__none__'))r=[];else r=r.filter(x=>sTnec.has(x.tnec));}
+    if(srch) r=r.filter(x=>x.codigo.toLowerCase().includes(srch)||x.desc.toLowerCase().includes(srch)||x.tipo.toLowerCase().includes(srch)||x.almacen.toLowerCase().includes(srch));
+    if(extraFn) r=r.filter(extraFn);
+    return r;
+  };
+
+  if(modoRefac==='prev'){
+    const tipoFn=sTipo.size>0&&!sTipo.has('__none__') ? r=>sTipo.has(r.tipo) : null;
+    baseClas=filt(allClas,tipoFn);
+    baseSC=[...allSC];
+  } else {
+    baseSC=filt(allSC,sFam.size>0?sFam.has('__none__')?()=>false:r=>sFam.has(r.tipo):null);
+    baseClas=[...allClas];
+  }
+  selTipos.clear(); selAlms.clear(); selRows.clear();
+  renderAll();
+}
+
+// ══ RENDER PRINCIPAL ═════════════════════════════════════════
+function renderAll(){
+  const activeRows=modoRefac==='prev'?baseClas:baseSC;
+  // Universo completo: siempre igual → gráfica de almacén tiene tamaño y columnas fijos
+  const almUniverse=modoRefac==='prev'?allClas:allSC;
+
+  // BI de tipo y almacén (clic en gráfica)
+  let biRows=activeRows;
+  if(selTipos.size>0) biRows=biRows.filter(r=>selTipos.has(r.tipo));
+  if(selAlms.size>0)  biRows=biRows.filter(r=>selAlms.has(r.almacen));
+
+  // Sidebar almacén: actúa igual que BI — filtra la tabla y resalta barras,
+  // pero NO cambia el número de columnas de la gráfica
+  const sidebarAlmActivo = MS.alm.sel.size>0 && !MS.alm.sel.has('__none__');
+  if(sidebarAlmActivo) biRows=biRows.filter(r=>MS.alm.sel.has(r.almacen));
+
+  const hasRowSel=selRows.size>0;
+  const selectedRows=hasRowSel?biRows.filter(r=>selRows.has(r.codigo)):biRows;
+  const chartSource=hasRowSel?selectedRows:biRows;
+  const rowSelTipos=hasRowSel?new Set(selectedRows.map(r=>r.tipo)):selTipos;
+  const rowSelAlms =hasRowSel?new Set(selectedRows.map(r=>r.almacen)):selAlms;
+
+  // Highlight de barras: BI tiene prioridad; si no hay BI, usar sidebar almacén
+  const almHighlight = rowSelAlms.size>0 ? rowSelAlms
+                     : sidebarAlmActivo   ? MS.alm.sel
+                     : new Set();
+
+  updateKPIs(activeRows, chartSource);
+  renderChartTipos(activeRows, rowSelTipos, rowSelAlms, hasRowSel?selectedRows:null);
+  // La gráfica de almacén siempre recibe almUniverse (completo) → tamaño fijo.
+  // Las alturas se calculan desde activeRows (filtrado por tipo/exist/clas/tnec).
+  // El highlight (dimming) viene de almHighlight.
+  renderChartAlm(activeRows, almUniverse, rowSelTipos, almHighlight, hasRowSel?selectedRows:null);
+  renderChartDiasAlm(hasRowSel?selectedRows:biRows, almUniverse);
+  renderTables(biRows, selectedRows);
+  updateBIBadge();
+  const hasSel=selTipos.size>0||selAlms.size>0||selRows.size>0||sidebarAlmActivo;
+  ['card-tipos','card-alm','tcard'].forEach(id=>DOM[id].classList.toggle('has-sel',hasSel));
+}
+
+// ══ KPIs ═════════════════════════════════════════════════════
+function updateKPIsc(){
+  DOM['k-sc'].textContent=allSC.length.toLocaleString();
+  DOM['k-sc-exist'].textContent=allSC.reduce((a,r)=>a+r.existencia,0).toLocaleString('es-MX')+' piezas';
+}
+function updateKPIs(base,bi){
+  const rows=(selTipos.size>0||selAlms.size>0||selRows.size>0)?bi:base;
+  const tot=rows.length;
+  let con=0,exist=0;
+  const tiposU=new Set();
+  for(const r of rows){
+    if(r.existencia>0)con++;
+    exist+=r.existencia;
+    tiposU.add(r.tipo);
+  }
+  const lbl=modoRefac==='prev'?'tipo(s) preventivo(s)':'familia(s)';
+  DOM['k-mat'].textContent=tot.toLocaleString();
+  DOM['k-tipos-sub'].textContent=tiposU.size+' '+lbl;
+  DOM['k-exist'].textContent=exist.toLocaleString('es-MX');
+  DOM['k-con'].textContent=con.toLocaleString();
+  DOM['k-con-p'].textContent=tot?(con/tot*100).toFixed(1)+'% del total':'—';
+  DOM['k-sin'].textContent=(tot-con).toLocaleString();
+  DOM['k-sin-p'].textContent=tot?((tot-con)/tot*100).toFixed(1)+'% del total':'—';
+  DOM['kpi-mat'].classList.toggle('hi',selTipos.size>0||selAlms.size>0||selRows.size>0);
+  // Días de inventario: promedio ponderado (suma exist / suma consumo diario)
+  let sumExist=0, sumDiar=0;
+  for(const r of rows){ sumExist+=r.existencia; sumDiar+=(r.consDiar||0); }
+  const diasProm = sumDiar>0 ? Math.round(sumExist/sumDiar) : null;
+  // Siempre buscar directo (no cachear porque el elemento puede no existir al init)
+  const kDias=document.getElementById('k-dias');
+  if(kDias) kDias.textContent = diasProm!=null ? diasProm.toLocaleString('es-MX') : '—';
+}
+
+// ══ GRÁFICAS SVG ═════════════════════════════════════════════
+function renderChartTipos(rows,sTipos,sAlms,rowData){
+  // Si hay filas seleccionadas en tabla, usarlas como fuente de las barras
+  const src=rowData ? rowData : (sAlms&&sAlms.size>0?rows.filter(r=>sAlms.has(r.almacen)):rows);
+  const tm={};
+  for(const r of src)tm[r.tipo]=(tm[r.tipo]||0)+r.existencia;
+  const data=Object.entries(tm).sort((a,b)=>b[1]-a[1]).map(([l,v],i)=>({l,v,c:PAL[i%PAL.length]}));
+  const ct=DOM['chart-tipos'];
+  if(!data.length){ct.innerHTML='<p style="padding:16px;font-size:12px;color:var(--tx3)">Sin datos</p>';return;}
+  const anyT=sTipos&&sTipos.size>0, maxV=Math.max(...data.map(d=>d.v));
+  const LW=148,BW=148,VW=60,PH=30,PV=14,W=LW+BW+VW,H=data.length*PH+PV*2;
+  const bars=data.map((d,i)=>{
+    const bw=maxV>0?Math.max(Math.round(d.v/maxV*BW),d.v>0?3:0):0;
+    const y=PV+i*PH, isSel=anyT&&sTipos.has(d.l), isDim=anyT&&!isSel;
+    const lbl=d.l.length>21?d.l.slice(0,20)+'…':d.l;
+    return `<g class="bar-group${isDim?' dimmed':''}${isSel?' selected':''}" onclick="onBarTipo(event,'${d.l.replace(/'/g,"\'")}')">
+<rect x="0" y="${y}" width="${W}" height="${PH}" fill="transparent"/>
+<text x="${LW-6}" y="${y+PH/2+4}" text-anchor="end" font-size="11" fill="${isDim?'var(--tx3)':'var(--tx2)'}" font-weight="${isSel?700:400}">${lbl}</text>
+<rect class="bar-rect" x="${LW}" y="${y+6}" width="${bw}" height="${PH-12}" rx="3" fill="${d.c}" opacity="${isDim?.3:.88}"${isSel?` stroke="${d.c}" stroke-width="1.5"`:''}/>
+<text x="${LW+bw+5}" y="${y+PH/2+4}" font-size="10" fill="var(--tx3)">${d.v.toLocaleString('es-MX')}</text>
+</g>`;
+  }).join('');
+  ct.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
+<text x="${W-2}" y="10" text-anchor="end" font-size="9" fill="var(--tx3)">Ctrl+clic = multi</text>${bars}</svg>`;
+}
+
+// renderChartAlm(rows, almUniverse, sTipos, sAlms, rowData)
+//   rows        → filas ya filtradas por sidebar (tipo, exist, clas, tnec)
+//                 determinan la ALTURA de cada barra
+//   almUniverse → universo completo de almacenes del modo actual
+//                 determina qué COLUMNAS se dibujan (tamaño fijo)
+//   sTipos      → highlight de tipo (BI)
+//   sAlms       → highlight de almacén (BI o sidebar)
+//   rowData     → selección de filas en tabla (BI de tabla)
+function renderChartAlm(rows, almUniverse, sTipos, sAlms, rowData){
+  // Fuente de datos para calcular alturas:
+  // si hay selección de filas en tabla → esas filas
+  // si hay highlight de tipo → filtrar por tipo
+  // si no → todas las filas filtradas por sidebar
+  const src=rowData ? rowData : (sTipos&&sTipos.size>0 ? rows.filter(r=>sTipos.has(r.tipo)) : rows);
+  window._almExportRows=src;
+
+  // Mapa de existencias por almacén (de las filas filtradas)
+  const amSrc={};
+  for(const r of src) amSrc[r.almacen]=(amSrc[r.almacen]||0)+r.existencia;
+
+  // Lista de almacenes: siempre del universo completo para mantener columnas fijas.
+  // Ordenar por existencia del contexto filtrado (mayor primero), luego alfabético.
+  const allAlms=[...new Set(almUniverse.map(r=>r.almacen))].sort((a,b)=>{
+    const va=amSrc[a]||0, vb=amSrc[b]||0;
+    return vb-va || a.localeCompare(b);
+  });
+
+  // Paleta fija por posición para que los colores no cambien al filtrar
+  const almColor={};
+  allAlms.forEach((a,i)=>almColor[a]=PAL[i%PAL.length]);
+
+  // data: siempre todos los almacenes; v=0 si el filtro no los incluye
+  const data=allAlms.map(alm=>({l:alm, v:amSrc[alm]||0, c:almColor[alm]}));
+
+  const ca=DOM['chart-alm'];
+  if(!data.length){ca.innerHTML='<p style="padding:16px;font-size:12px;color:var(--tx3)">Sin datos</p>';return;}
+
+  const anyA=sAlms&&sAlms.size>0;
+  // maxV sobre las barras del contexto filtrado (no 0) para escalar bien
+  const maxV=Math.max(...data.map(d=>d.v),1);
+
+  // Dimensiones fijas
+  const CW=34,GAP=5,PL=6,PR=6,PT=28,PB=58,BH=110;
+  const W=PL+(CW+GAP)*data.length+PR, H=BH+PT+PB;
+
+  const cols=data.map((d,i)=>{
+    const bh=d.v>0?Math.max(Math.round(d.v/maxV*BH),3):0;
+    const x=PL+i*(CW+GAP), y=PT+(BH-bh);
+    const isSel=anyA&&sAlms.has(d.l), isDim=anyA&&!isSel;
+    const isEmpty=d.v===0;
+    const lbl=d.l.includes('–')?d.l.split('–')[0].trim():d.l.slice(0,5);
+    const sub=d.l.includes('–')?d.l.split('–')[1].trim():'';
+    const barEl=isEmpty
+      ? `<rect x="${x}" y="${PT+BH-1}" width="${CW}" height="2" rx="1" fill="${d.c}" opacity="0.2"/>`
+      : `<rect class="bar-rect" x="${x}" y="${y}" width="${CW}" height="${bh}" rx="3" fill="${d.c}" opacity="${isDim?.25:.88}"${isSel?` stroke="${d.c}" stroke-width="1.5"`:''}/>`;
+    return `<g class="bar-group${isDim?' dimmed':''}${isSel?' selected':''}" data-alm="${d.l}" onclick="onBarAlm(event,this)">
+<rect x="${x-2}" y="${PT}" width="${CW+4}" height="${BH+PB}" fill="transparent"/>
+${barEl}
+<text x="${x+CW/2}" y="${PT+BH+13}" text-anchor="middle" font-size="9" font-weight="${isSel?700:400}" fill="${isEmpty?'var(--tx3)':isDim?'var(--tx3)':'var(--tx2)'}">${lbl}</text>
+<text x="${x+CW/2}" y="${PT+BH+24}" text-anchor="middle" font-size="8" fill="var(--tx3)">${sub.length>7?sub.slice(0,6)+'…':sub}</text>
+<text x="${x+CW/2}" y="${y-5}" text-anchor="middle" font-size="9" fill="${isEmpty?'var(--tx3)':isDim?'var(--tx3)':'var(--tx2)'}">${isEmpty?'':d.v.toLocaleString('es-MX')}</text>
+</g>`;
+  }).join('');
+
+  ca.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
+<text x="${W-2}" y="12" text-anchor="end" font-size="9" fill="var(--tx3)">Ctrl+clic = multi</text>
+<line x1="${PL}" y1="${PT+BH}" x2="${W-PR}" y2="${PT+BH}" stroke="var(--bord2)" stroke-width="0.5"/>
+${cols}</svg>`;
+}
+
+
+// ══ GRÁFICA DÍAS DE INVENTARIO POR ALMACÉN ═══════════════════
+function renderChartDiasAlm(rows, almUniverse){
+  const ca=document.getElementById('chart-dias-alm');
+  if(!ca) return;
+  // Calcular días por almacén
+  const amSrc={};
+  for(const r of rows){
+    if(!amSrc[r.almacen])amSrc[r.almacen]={exist:0,diar:0};
+    amSrc[r.almacen].exist+=r.existencia;
+    amSrc[r.almacen].diar+=(r.consDiar||0);
+  }
+  const allAlms=[...new Set(almUniverse.map(r=>r.almacen))].sort((a,b)=>{
+    const da=amSrc[a]&&amSrc[a].diar>0?amSrc[a].exist/amSrc[a].diar:0;
+    const db=amSrc[b]&&amSrc[b].diar>0?amSrc[b].exist/amSrc[b].diar:0;
+    return db-da||a.localeCompare(b);
+  });
+  const data=allAlms.map((alm,i)=>{
+    const s=amSrc[alm];
+    const dias=s&&s.diar>0?Math.round(s.exist/s.diar):null;
+    return{l:alm,v:dias,c:PAL[i%PAL.length]};
+  });
+  if(!data.length){ca.innerHTML='<p style="padding:16px;font-size:12px;color:var(--tx3)">Sin datos con consumo diario</p>';return;}
+  const maxV=Math.max(...data.map(d=>d.v||0),1);
+  const n=data.length;
+  // Dimensiones: ancho de columna se adapta al número de almacenes
+  const containerW=ca.offsetWidth||400;
+  const PL=8,PR=8,PT=24,PB=54,BH=100;
+  const availW=containerW-PL-PR;
+  const CW=Math.max(16,Math.min(40,Math.floor(availW/n)-4));
+  const GAP=Math.max(2,Math.min(6,Math.floor((availW-CW*n)/(n+1))));
+  const W=PL+(CW+GAP)*n+PR, H=BH+PT+PB;
+  // Tamaño de fuente autoajustable: menor si hay muchos almacenes
+  const fsLbl=Math.max(7,Math.min(10,Math.floor(CW*0.28)));
+  const fsSub=Math.max(6,Math.min(9,fsLbl-1));
+  const fsVal=Math.max(7,Math.min(10,fsLbl));
+  const cols=data.map((d,i)=>{
+    const bh=d.v!=null&&d.v>0?Math.max(Math.round(d.v/maxV*BH),3):0;
+    const x=PL+i*(CW+GAP), y=PT+(BH-bh);
+    const isEmpty=d.v==null||d.v===0;
+    const lbl=d.l.includes('–')?d.l.split('–')[0].trim():d.l.slice(0,5);
+    const sub=d.l.includes('–')?d.l.split('–')[1].trim():'';
+    // Truncar sub según ancho de columna (aprox 1 char = 5px)
+    const maxChars=Math.max(2,Math.floor(CW/fsSub*1.4));
+    const subTrunc=sub.length>maxChars?sub.slice(0,maxChars-1)+'…':sub;
+    const barEl=isEmpty
+      ?`<rect x="${x}" y="${PT+BH-1}" width="${CW}" height="2" rx="1" fill="${d.c}" opacity="0.2"/>`
+      :`<rect x="${x}" y="${y}" width="${CW}" height="${bh}" rx="3" fill="${d.c}" opacity=".85"/>`;
+    return `<g>
+<rect x="${x-2}" y="${PT}" width="${CW+4}" height="${BH+PB}" fill="transparent"/>
+${barEl}
+<text x="${x+CW/2}" y="${PT+BH+fsLbl+2}" text-anchor="middle" font-size="${fsLbl}" fill="${isEmpty?'var(--tx3)':'var(--tx2)'}">${lbl}</text>
+<text x="${x+CW/2}" y="${PT+BH+fsLbl+fsSub+4}" text-anchor="middle" font-size="${fsSub}" fill="var(--tx3)">${subTrunc}</text>
+<text x="${x+CW/2}" y="${y-4}" text-anchor="middle" font-size="${fsVal}" fill="${isEmpty?'var(--tx3)':'var(--tx2)'}">${isEmpty?'':d.v.toLocaleString('es-MX')}</text>
+</g>`;
+  }).join('');
+  ca.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
+<line x1="${PL}" y1="${PT+BH}" x2="${W-PR}" y2="${PT+BH}" stroke="var(--bord2)" stroke-width="0.5"/>
+${cols}</svg>`;
+}
+
+
+// ══ INTERACCIÓN BI ════════════════════════════════════════════
+// Al hacer clic en una barra, actualiza TAMBIÉN el filtro sidebar correspondiente
+
+function onBarTipo(evt,tipo){
+  // Ctrl+clic = multi-selección
+  if(evt.ctrlKey||evt.metaKey){
+    if(selTipos.has(tipo)) selTipos.delete(tipo); else selTipos.add(tipo);
+  } else {
+    if(selTipos.size===1&&selTipos.has(tipo)) selTipos.clear();
+    else { selTipos.clear(); selTipos.add(tipo); }
+  }
+  // Sincronizar con filtro sidebar MS.tipo si está en modo prev
+  if(modoRefac==='prev'){
+    if(selTipos.size===0){ MS.tipo.sel.clear(); msRender('tipo'); msBadge('tipo'); }
+    else if(selTipos.size===1){ msSetSingle('tipo',[...selTipos][0]); }
+    else{ msSetMultiple('tipo',[...selTipos]); }
+  }
+  // Sincronizar con filtro sidebar de Familia si está en modo corr
+  if(modoRefac==='corr'){
+    if(selTipos.size===0) MS.fam.sel.clear();
+    else if(selTipos.size===1) msSetSingle('fam',[...selTipos][0]);
+    else msSetMultiple('fam',[...selTipos]);
+  }
+  selRows.clear(); renderAll();
+}
+
+function onBarAlm(evt,el){
+  const alm=el.getAttribute('data-alm');
+  if(evt.ctrlKey||evt.metaKey){
+    if(selAlms.has(alm)) selAlms.delete(alm); else selAlms.add(alm);
+  } else {
+    if(selAlms.size===1&&selAlms.has(alm)) selAlms.clear();
+    else { selAlms.clear(); selAlms.add(alm); }
+  }
+  // Sincronizar con filtro sidebar de Almacén
+  if(selAlms.size===0) MS.alm.sel.clear();
+  else if(selAlms.size===1) msSetSingle('alm',[...selAlms][0]);
+  else msSetMultiple('alm',[...selAlms]);
+  selRows.clear(); renderAll();
+}
+
+function onRowClick(evt,key){
+  if(evt.ctrlKey||evt.metaKey){if(selRows.has(key))selRows.delete(key);else selRows.add(key);}
+  else{if(selRows.size===1&&selRows.has(key))selRows.clear();else{selRows.clear();selRows.add(key);}}
+  selTipos.clear(); selAlms.clear();
+  // Al limpiar BI de barras, resetear filtros sidebar que estaban coordinados
+  MS.alm.sel.clear(); msRender('alm'); msBadge('alm');
+  renderAll();
+}
+
+function clearBISelection(){
+  selTipos.clear(); selAlms.clear(); selRows.clear();
+  // Resetear filtros sidebar coordinados con BI
+  MS.alm.sel.clear(); msRender('alm'); msBadge('alm');
+  if(modoRefac==='prev'){ MS.tipo.sel.clear(); msRender('tipo'); msBadge('tipo'); }
+  if(modoRefac==='corr'){ MS.fam.sel.clear(); msRender('fam'); msBadge('fam'); }
+  renderAll();
+}
+
+function updateBIBadge(){
+  const badge=DOM['active-filter'], parts=[];
+  if(selTipos.size===1)parts.push([...selTipos][0]);
+  else if(selTipos.size>1)parts.push(selTipos.size+' tipos');
+  if(selAlms.size===1)parts.push([...selAlms][0]);
+  else if(selAlms.size>1)parts.push(selAlms.size+' almacenes');
+  if(selRows.size>0)parts.push(selRows.size+(selRows.size===1?' código':' códigos'));
+  badge.style.display=parts.length?'inline-block':'none';
+  if(parts.length)badge.textContent='✕ '+parts.join(' · ');
+}
+
+// ══ TABLAS ════════════════════════════════════════════════════
+let activeTab='det';
+function setActiveTab(t){
+  activeTab=t;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tc').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll(`.tab[data-t="${t}"]`).forEach(x=>x.classList.add('active'));
+  $('tc-'+t).classList.add('active');
+}
+
+function renderTables(rows,tableRows){
+  const disp=tableRows&&tableRows.length>0?tableRows:rows;
+  window._exportRows=disp;
+  const hasSel=selRows.size>0;
+  DOM['table-count'].textContent=rows.length+(hasSel?' ('+selRows.size+(selRows.size===1?' cód. sel.)':' cód. sel.)'):'')+ ' registros';
+  // Tabla detalle — máx 600 filas, usa innerHTML acumulado en array (join más rápido que concatenar)
+  const detParts=[];
+  const limit=Math.min(rows.length,600);
+  for(let i=0;i<limit;i++){
+    const r=rows[i];
+    const key=r.codigo, isSel=selRows.has(key), isDim=hasSel&&!isSel;
+    const cd=r.consDiar!=null?r.consDiar.toFixed(1):'—';
+    const di=r.diasInv!=null?Math.round(r.diasInv).toLocaleString('es-MX'):'—';
+    detParts.push(`<tr class="${isSel?'row-selected':isDim?'row-dimmed':''}" onclick="onRowClick(event,'${key.replace(/'/g,"\'")}')"><td><code style="font-size:11px;background:var(--surf2);padding:1px 4px;border-radius:3px">${r.codigo}</code></td><td title="${r.desc}">${r.desc||'—'}</td><td><span class="badge ${badgeClass(r.tipo)}">${r.tipo}</span></td><td>${r.almacen}</td><td><span style="font-size:11px;color:var(--tx2)">${r.clasif||'—'}</span></td><td><span style="font-size:11px;color:var(--tx2)">${r.tnec||'—'}</span></td><td style="text-align:right"><span class="badge ${r.existencia>0?'b-green':'b-red'}">${r.existencia.toLocaleString('es-MX')}</span></td><td style="text-align:right;font-size:12px">${cd}</td><td style="text-align:right;font-size:12px">${di}</td></tr>`);
+  }
+  DOM['tb-det'].innerHTML=detParts.join('');
+  // Resumen por tipo — un solo loop
+  const rm={};
+  for(const r of rows){
+    if(!rm[r.tipo])rm[r.tipo]={tot:0,con:0,sin:0,exist:0,sumDiar:0};
+    rm[r.tipo].tot++;
+    rm[r.tipo].sumDiar+=(r.consDiar||0);
+    if(r.existencia>0){rm[r.tipo].con++;rm[r.tipo].exist+=r.existencia;}else rm[r.tipo].sin++;
+  }
+  DOM['tb-res'].innerHTML=Object.entries(rm)
+    .sort((a,b)=>{if(a[0]==='Sin clasificar')return 1;if(b[0]==='Sin clasificar')return -1;return b[1].exist-a[1].exist;})
+    .map(([tipo,d])=>{
+      const pct=d.tot?Math.round(d.con/d.tot*100):0;
+      const fc=pct>=80?'#2d6a0f':pct>=40?'#7a4800':'#a32d2d';
+      const isSel=selRows.size>0&&[...selRows].some(k=>k.split('||')[0]==='__tipo__'+tipo);
+      const tcd=d.sumDiar>0?d.sumDiar.toFixed(1):'—';
+      const tdi=d.sumDiar>0?Math.round(d.exist/d.sumDiar).toLocaleString('es-MX'):'—';
+      return `<tr class="${isSel?'row-selected':''}" style="${tipo==='Sin clasificar'?'background:var(--amber-bg)':''}" onclick="onTipoRowClick(event,'${tipo.replace(/'/g,"\'")}')"><td><span class="badge ${badgeClass(tipo)}">${tipo}</span></td><td style="text-align:right;font-weight:600">${d.tot}</td><td style="text-align:right;color:var(--green)">${d.con}</td><td style="text-align:right;color:var(--red)">${d.sin}</td><td><div class="prog"><div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${fc}"></div></div><span class="prog-val">${pct}%</span></div></td><td style="text-align:right">${d.exist.toLocaleString('es-MX')}</td><td style="text-align:right;font-size:12px">${tcd}</td><td style="text-align:right;font-size:12px">${tdi}</td></tr>`;
+    }).join('');
+  // Por almacén — un solo loop
+  const am={};
+  for(const r of rows){
+    const k=r.almacen+'||'+r.tipo;
+    if(!am[k])am[k]={alm:r.almacen,tipo:r.tipo,cnt:0,exist:0,sumDiar:0};
+    am[k].cnt++;am[k].exist+=r.existencia;am[k].sumDiar+=(r.consDiar||0);
+  }
+  DOM['tb-alm'].innerHTML=Object.values(am)
+    .sort((a,b)=>a.alm.localeCompare(b.alm)||b.exist-a.exist)
+    .map(e=>{
+      const isSel=selAlms.has(e.alm)||selTipos.has(e.tipo);
+      const acd=e.sumDiar>0?e.sumDiar.toFixed(1):'—';
+      const adi=e.sumDiar>0?Math.round(e.exist/e.sumDiar).toLocaleString('es-MX'):'—';
+      return `<tr class="${isSel?'row-selected':''}" onclick="onAlmRowClick(event,'${e.alm.replace(/'/g,"\'")}','${e.tipo.replace(/'/g,"\'")}')"><td style="font-weight:500">${e.alm}</td><td><span class="badge ${badgeClass(e.tipo)}">${e.tipo}</span></td><td style="text-align:right">${e.cnt}</td><td style="text-align:right">${e.exist.toLocaleString('es-MX')}</td><td style="text-align:right;font-size:12px">${acd}</td><td style="text-align:right;font-size:12px">${adi}</td></tr>`;
+    }).join('');
+}
+
+// Clics en filas de resumen → activan filtro BI en gráficas
+function onTipoRowClick(evt,tipo){
+  if(evt.ctrlKey||evt.metaKey){if(selTipos.has(tipo))selTipos.delete(tipo);else selTipos.add(tipo);}
+  else{if(selTipos.size===1&&selTipos.has(tipo))selTipos.clear();else{selTipos.clear();selTipos.add(tipo);}}
+  selRows.clear();selAlms.clear();renderAll();
+}
+function onAlmRowClick(evt,alm,tipo){
+  if(evt.ctrlKey||evt.metaKey){if(selAlms.has(alm))selAlms.delete(alm);else selAlms.add(alm);}
+  else{if(selAlms.size===1&&selAlms.has(alm))selAlms.clear();else{selAlms.clear();selAlms.add(alm);}}
+  selRows.clear();renderAll();
+}
+
+// ══ EXPORTAR ALMACÉN ═════════════════════════════════════════
+function exportAlmacenExcel(){
+  const rows=window._almExportRows||[];
+  if(!rows.length){alert('No hay datos para exportar.');return;}
+  const fecha=new Date().toISOString().slice(0,10);
+  const wb=XLSX.utils.book_new();
+  const resMap={};
+  for(const r of rows){
+    if(!resMap[r.almacen])resMap[r.almacen]={'Almacén':r.almacen,'Materiales':0,'Con Existencia':0,'Sin Existencia':0,'Total Existencias':0};
+    resMap[r.almacen]['Materiales']++;
+    if(r.existencia>0)resMap[r.almacen]['Con Existencia']++;else resMap[r.almacen]['Sin Existencia']++;
+    resMap[r.almacen]['Total Existencias']+=r.existencia;
+  }
+  const res=Object.values(resMap).sort((a,b)=>b['Total Existencias']-a['Total Existencias']);
+  res.push({'Almacén':'TOTAL','Materiales':res.reduce((s,r)=>s+r['Materiales'],0),'Con Existencia':res.reduce((s,r)=>s+r['Con Existencia'],0),'Sin Existencia':res.reduce((s,r)=>s+r['Sin Existencia'],0),'Total Existencias':res.reduce((s,r)=>s+r['Total Existencias'],0)});
+  const wsR=XLSX.utils.json_to_sheet(res);wsR['!cols']=[{wch:28},{wch:14},{wch:16},{wch:16},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,wsR,'Resumen por Almacén');
+  const det=rows.sort((a,b)=>a.almacen.localeCompare(b.almacen)||b.existencia-a.existencia).map(r=>({'Almacén':r.almacen,'Código':r.codigo,'Descripción':r.desc,'Tipo Mantenimiento':r.tipo,'Clasificación':r.clasif||'','Familia':r.familia||'','Existencias':r.existencia}));
+  const wsD=XLSX.utils.json_to_sheet(det);wsD['!cols']=[{wch:24},{wch:18},{wch:38},{wch:24},{wch:18},{wch:20},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,wsD,'Detalle por Almacén');
+  XLSX.writeFile(wb,'Existencias_Almacen_'+fecha+'.xlsx');
+}
+
+// ══ EXPORTAR TABLAS ══════════════════════════════════════════
+function exportTabla(tab){
+  const rows=window._exportRows||[];
+  if(!rows.length){alert('No hay datos.');return;}
+  const fecha=new Date().toISOString().slice(0,10);
+  const wb=XLSX.utils.book_new();
+  if(tab==='det'){
+    const ws=XLSX.utils.json_to_sheet(rows.map(r=>({'Código':r.codigo,'Descripción':r.desc,'Tipo Mantenimiento':r.tipo,'Almacén':r.almacen,'Clasificación':r.clasif||'','Familia':r.familia||'','Existencias':r.existencia})));
+    ws['!cols']=[{wch:20},{wch:40},{wch:24},{wch:22},{wch:18},{wch:20},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,ws,'Por Material');
+    XLSX.writeFile(wb,'Detalle_Materiales_'+fecha+'.xlsx');
+  } else if(tab==='res'){
+    const rm={};
+    for(const r of rows){if(!rm[r.tipo])rm[r.tipo]={tot:0,con:0,sin:0,exist:0};rm[r.tipo].tot++;if(r.existencia>0){rm[r.tipo].con++;rm[r.tipo].exist+=r.existencia;}else rm[r.tipo].sin++;}
+    const rd=Object.entries(rm).sort((a,b)=>{if(a[0]==='Sin clasificar')return 1;if(b[0]==='Sin clasificar')return -1;return b[1].exist-a[1].exist;}).map(([t,d])=>({'Tipo':t,'Total':d.tot,'Con Existencia':d.con,'Sin Existencia':d.sin,'Cobertura %':d.tot?Math.round(d.con/d.tot*100):0,'Total Existencias':d.exist}));
+    rd.push({'Tipo':'TOTAL','Total':rd.reduce((s,r)=>s+r['Total'],0),'Con Existencia':rd.reduce((s,r)=>s+r['Con Existencia'],0),'Sin Existencia':rd.reduce((s,r)=>s+r['Sin Existencia'],0),'Cobertura %':'','Total Existencias':rd.reduce((s,r)=>s+(r['Total Existencias']||0),0)});
+    const ws1=XLSX.utils.json_to_sheet(rd);ws1['!cols']=[{wch:28},{wch:10},{wch:16},{wch:16},{wch:14},{wch:20}];
+    XLSX.utils.book_append_sheet(wb,ws1,'Resumen por Tipo');
+    const wd=rows.sort((a,b)=>a.tipo.localeCompare(b.tipo)||b.existencia-a.existencia).map(r=>({'Tipo':r.tipo,'Código':r.codigo,'Descripción':r.desc,'Almacén':r.almacen,'Clasificación':r.clasif||'','Familia':r.familia||'','Existencias':r.existencia}));
+    const ws2=XLSX.utils.json_to_sheet(wd);ws2['!cols']=[{wch:26},{wch:20},{wch:40},{wch:22},{wch:18},{wch:20},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,ws2,'Detalle por Tipo');
+    XLSX.writeFile(wb,'Inventario_Por_Tipo_'+fecha+'.xlsx');
+  } else if(tab==='alm'){
+    const am={};
+    for(const r of rows){const k=r.almacen+'||'+r.tipo;if(!am[k])am[k]={alm:r.almacen,tipo:r.tipo,cnt:0,con:0,sin:0,exist:0};am[k].cnt++;if(r.existencia>0){am[k].con++;am[k].exist+=r.existencia;}else am[k].sin++;}
+    const ad=Object.values(am).sort((a,b)=>a.alm.localeCompare(b.alm)||b.exist-a.exist).map(e=>({'Almacén':e.alm,'Tipo':e.tipo,'Total':e.cnt,'Con Existencia':e.con,'Sin Existencia':e.sin,'Total Existencias':e.exist}));
+    ad.push({'Almacén':'TOTAL','Tipo':'','Total':ad.reduce((s,r)=>s+r['Total'],0),'Con Existencia':ad.reduce((s,r)=>s+r['Con Existencia'],0),'Sin Existencia':ad.reduce((s,r)=>s+r['Sin Existencia'],0),'Total Existencias':ad.reduce((s,r)=>s+(r['Total Existencias']||0),0)});
+    const ws1=XLSX.utils.json_to_sheet(ad);ws1['!cols']=[{wch:24},{wch:26},{wch:10},{wch:16},{wch:16},{wch:20}];
+    XLSX.utils.book_append_sheet(wb,ws1,'Resumen por Almacén');
+    const dd=rows.sort((a,b)=>a.almacen.localeCompare(b.almacen)||a.tipo.localeCompare(b.tipo)||b.existencia-a.existencia).map(r=>({'Almacén':r.almacen,'Tipo':r.tipo,'Código':r.codigo,'Descripción':r.desc,'Clasificación':r.clasif||'','Familia':r.familia||'','Existencias':r.existencia}));
+    const ws2=XLSX.utils.json_to_sheet(dd);ws2['!cols']=[{wch:22},{wch:26},{wch:20},{wch:40},{wch:18},{wch:20},{wch:14}];
+    XLSX.utils.book_append_sheet(wb,ws2,'Detalle por Almacén');
+    XLSX.writeFile(wb,'Inventario_Por_Almacen_'+fecha+'.xlsx');
+  }
+}
+
+// ══ EVENTOS ══════════════════════════════════════════════════
+['f-tipo','f-exist'].forEach(id=>{
+  const el=$(id);
+  if(el) el.addEventListener('change',()=>{ if(allClas.length||allSC.length) applyFilters(); });
+});
+// Búsqueda con debounce (200ms) — usa el mismo timer que scheduleFilter
+$('search').addEventListener('input',()=>{
+  clearTimeout(_filterTimer);
+  _filterTimer=setTimeout(()=>{ if(allClas.length) applyFilters(); }, 200);
+});
+
+init();
+</script>
+</body>
+</html>
